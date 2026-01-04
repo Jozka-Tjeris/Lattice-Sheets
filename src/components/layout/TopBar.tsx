@@ -1,3 +1,5 @@
+import { LogoutButton } from "@/components/ui/LogoutButton";
+
 export function TopBar(){
     return <nav className="flex flex-row items-center border-b w-full h-14 p-4">
   {/* <!-- Left section: collapse button + logo --> */}
@@ -72,6 +74,8 @@ export function TopBar(){
         </div>
       </div>
     </div>
+    {/* Logout button on the right */}
+    <LogoutButton />
   </div>
 </nav>
 }
