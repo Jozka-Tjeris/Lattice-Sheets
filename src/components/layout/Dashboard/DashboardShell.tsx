@@ -1,5 +1,5 @@
 import { TopBar } from "./TopBar";
-import { Sidebar } from "./Sidebar";
+import { Sidebar } from "./SideBar";
 import { BaseIcon } from "./BaseIcon";
 
 
@@ -26,59 +26,3 @@ export function DashboardShell() {
     </div>
   </div>;
 }
-
-/*
-<div className="flex">
-<div className="flex flex-col">
-<div className="flex items-center">
-<div className="flex justify-between">
-
-flex	display: flex
-flex-col	vertical layout
-items-center	align-items
-justify-between	space between
-
-<div className="h-screen w-screen flex">
-h-screen → full viewport height
-
-w-screen → full viewport width
-*/
-
-/*
-p-4   = padding: 1rem
-px-4  = padding-left/right
-py-2  = padding-top/bottom
-
-p-2	tight spacing
-p-4	standard
-px-4	top bars
-gap-2	space between flex items
-*/
-
-/*
-border
-border-b
-border-r
-border-dashed
-
-Subtle borders (very Airtable)
-
-border border-muted
-border-b border-border
-
-You’ll often combine:
-
-<div className="border-b h-12 flex items-center px-4" />
-*/
-
-/*
-text-sm
-text-xs
-font-medium
-font-semibold
-
-Typical dashboard text
-
-<div className="text-sm font-medium">Table name</div>
-<div className="text-xs text-muted-foreground">Grid view</div>
-*/
