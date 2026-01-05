@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -20,10 +20,6 @@ export function BaseTable() {
   const [data, setData] = useState<Row[]>(rows);
   const [columnsState, setColumnsState] = useState<typeof columnMeta>(columnMeta);
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  const registerRef = (id: string, el: HTMLDivElement | null) => {
-    cellRefs.current[id] = el;
-  };
 
   // Detect clicks ouside grid
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -65,11 +61,15 @@ export function BaseTable() {
   // -----------------------------
   // Function to update a single cell
   // -----------------------------
-  const updateCell = (rowIndex: number, columnId: string, value: string) => {
+  const updateCell = useCallback((rowIndex: number, columnId: string, value: string) => {
     setData(old =>
       old.map((row, i) => (i === rowIndex ? { ...row, [columnId]: value } : row))
     );
-  };
+  }, []); // Empty deps because it uses the functional update 'old => ...'
+
+  const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    cellRefs.current[id] = el;
+  }, []);
 
   // -----------------------------
   // Dynamic column functions
@@ -85,7 +85,7 @@ export function BaseTable() {
   // -----------------------------
   // Navigation helper
   // -----------------------------
-  const moveToCell = (rowIndex: number, colIndex: number) => {
+  const moveToCell = useCallback((rowIndex: number, colIndex: number) => {
     if (
       rowIndex < 0 ||
       rowIndex >= data.length ||
@@ -94,11 +94,9 @@ export function BaseTable() {
     )
       return;
 
-    console.log("hey there", rowIndex, colIndex);
-
     const columnId = columnsState[colIndex]!.id;
     setActiveCell({ rowIndex, columnId });
-  };
+  }, [data.length, columnsState]);
 
   // -----------------------------
   // Columns for TanStack Table
@@ -138,7 +136,7 @@ export function BaseTable() {
         minSize: 80,
         maxSize: 300,
       })),
-    [columnsState, activeCell, data]
+    [columnsState, activeCell, data, moveToCell]
   );
 
   // -----------------------------

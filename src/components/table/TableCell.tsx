@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, memo } from "react";
 
 type TableCellProps = {
   value: string;
@@ -13,7 +13,7 @@ type TableCellProps = {
   registerRef?: (id: string, el: HTMLDivElement | null) => void;
 };
 
-export function TableCell({
+export const TableCell = memo(function TableCell({
   value,
   onChange,
   onClick,
@@ -29,6 +29,11 @@ export function TableCell({
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const divRef = useRef<HTMLDivElement>(null);
+
+  // Sync local state if external value changes (e.g., undo/redo or formulas)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
 
   useEffect(() => {
     registerRef?.(cellId, divRef.current);
@@ -110,17 +115,32 @@ export function TableCell({
   };
 
   return (
-    <div
-      ref={divRef}       // needed for focusing
-      tabIndex={0}       // makes div focusable
-      className={`
-        w-full px-2 py-1 truncate cursor-text hover:bg-gray-50 
-        ${isActive ? "outline outline-2 outline-blue-500" : "border"}
-      `}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-    >
-      {value}
-    </div>
-  );
-}
+      <div
+        ref={divRef}
+        tabIndex={0}
+        className={`w-full px-2 py-1 truncate cursor-text hover:bg-gray-50 
+          ${isActive ? "outline outline-2 outline-blue-500" : "border"}`}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+      >
+        {isEditing ? (
+          <input 
+            autoFocus 
+            value={localValue} 
+            onBlur={commit}
+            onChange={(e) => setLocalValue(e.target.value)}
+            className="w-full outline-none" 
+          />
+        ) : (
+          value
+        )}
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // CUSTOM COMPARISON: Only re-render if these specific things change
+    return (
+      prevProps.value === nextProps.value &&
+      prevProps.isActive === nextProps.isActive &&
+      prevProps.cellId === nextProps.cellId
+    );
+});
