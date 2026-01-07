@@ -109,7 +109,7 @@ export const TableCell = memo(function TableCell({
     return (
       <input
         ref={inputRef}
-        className="w-full px-2 py-1 border border-blue-500 outline-none ring-2 ring-blue-400"
+        className="w-full h-full px-2 py-1 border border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)] z-10 relative"
         style={{ minWidth: 0 }}
         value={localValue}
         onChange={e => setLocalValue(e.target.value)}
@@ -133,22 +133,20 @@ export const TableCell = memo(function TableCell({
       ref={divRef}
       tabIndex={0}
       className={`
-        w-full h-full px-2 py-1 truncate cursor-text
-        outline-none
-        transition-colors
-
+        w-full h-full px-2 py-1 flex items-start
+        cursor-text truncate transition-colors
         hover:bg-gray-100
-
         ${isActive
-          ? "bg-blue-50 ring-2 ring-blue-400"
+          ? "border border-blue-500 shadow-[0_0_0_2px_rgba(60,120,255,1)] z-10 relative rounded-[1px]"
           : "border border-transparent"}
-
-        focus:ring-2 focus:ring-blue-500
       `}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
-      {value}
+      {/* Adding transparent span prevents cell from collapsing in size */}
+      {value || (
+        <span className="text-transparent select-none">.</span>
+      )}
     </div>
   );
 }, (prev, next) =>

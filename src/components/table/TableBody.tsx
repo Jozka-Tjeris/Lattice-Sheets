@@ -61,7 +61,7 @@ export function TableBody() {
         <tr key={row.id} className="border-b last:border-0 hover:bg-[#f0f0f0]"
           onContextMenu={(e) => handleRowRightClick(e, row.original.id, row.original.order)}>
           {row.getVisibleCells().map(cell => (
-            <td key={cell.id} className="px-4 py-2 border-r">
+            <td key={cell.id} className="border-r p-0 align-top">
               {flexRender(
                 cell.column.columnDef.cell,
                 cell.getContext()
