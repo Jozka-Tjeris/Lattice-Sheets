@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode, useRef, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, type ReactNode, useRef, useEffect, type SetStateAction } from "react";
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getSortedRowModel, type ColumnDef,
-  type SortingState, type ColumnFiltersState, type VisibilityState, type ColumnSizingState
+  type SortingState, type ColumnFiltersState, type VisibilityState, type ColumnSizingState,
  } from "@tanstack/react-table";
 import type { Column, Row, CellMap, CellValue, TableRow } from "./tableTypes";
 import { TableCell } from "../TableCell";
@@ -84,7 +84,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       const updated: CellMap = {};
       Object.entries(prev).forEach(([key, value]) => {
         const [rId] = key.split(":");
-        if (rId !== rowId) updated[key as keyof CellMap] = value;
+        if (rId !== rowId) updated[key] = value;
       });
       return updated;
     });
@@ -127,7 +127,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       const updated: CellMap = {};
       Object.entries(prev).forEach(([key, value]) => {
         const [, colId] = key.split(":");
-        if (colId !== columnId) updated[key as keyof CellMap] = value;
+        if (colId !== columnId) updated[key] = value;
       });
       return updated;
     });
@@ -148,7 +148,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
     }
   }, [activeCell]);
 
-  const handleSortingChange = useCallback((updaterOrValue: any) => {
+  const handleSortingChange = useCallback((updaterOrValue: SetStateAction<SortingState>) => {
     setSorting(updaterOrValue);
     // This force-syncs the state update
   }, []);
@@ -172,7 +172,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
         });
       })
       .map((row, idx) => {
-        const record: Record<string, any> = { id: row.id, order: idx };
+        const record: Record<string, CellValue> = { id: row.id, order: idx };
         columns.forEach(col => {
           record[col.id] = cells[`${row.id}:${col.id}`] ?? "";
         });
@@ -181,8 +181,8 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   }, [visibleRows, columns, cells, globalSearch]);
 
   // Column defs for TanStack
-  const tableColumns: ColumnDef<any>[] = useMemo(() => {
-    return columns.map((col, colIndex) => ({
+  const tableColumns: ColumnDef<unknown>[] = useMemo(() => {
+    return columns.map((col) => ({
       id: col.id,
       accessorKey: col.id,
       header: col.label,
@@ -193,7 +193,8 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       maxSize: 300,
       enableResizing: true,
       cell: info => {
-        const rowId = info.row.original.id;
+        const rowElem = info.row.original as Row;
+        const rowId = rowElem.id;
         const columnId = col.id;
         const cellKey = `${rowId}:${columnId}`;
 
@@ -252,7 +253,8 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
     sorting,
     columnFilters,
     columnSizing
-  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, tableColumns, table, sorting]); // 'table' reference stability is key
+  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, table, sorting,
+    handleAddColumn, handleAddRow, handleDeleteColumn, handleDeleteRow, handleRenameColumn, registerRef, updateCell]);
 
   return (
     <TableContext.Provider value={contextValue}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect } from "react";
 import { useTableController } from "@/components/table/controller/TableProvider";
 import { TableHeader } from "./TableHeader";
 import { TableBody } from "./TableBody";

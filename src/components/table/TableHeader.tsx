@@ -140,7 +140,7 @@ export function TableHeader() {
       ) : (
         <tr style={{ height: headerHeight }}>
            <th colSpan={100} className="px-4 py-2 text-center text-gray-400 font-normal">
-            No columns yet. Click "+" to start.
+            No columns yet. Click &quot;+&quot; to start.
             <button
                 onClick={handleAddColumn}
                 className="ml-4 inline-flex items-center justify-center w-6 h-6 bg-green-500 text-white rounded hover:bg-green-600 transition"
