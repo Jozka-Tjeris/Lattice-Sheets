@@ -36,11 +36,13 @@ export const TableCell = memo(function TableCell({
     setLocalValue(value);
   }, [value]);
 
+  // Register ref for navigation
   useEffect(() => {
     registerRef?.(cellId, divRef.current);
     return () => registerRef?.(cellId, null);
   }, [cellId, registerRef]);
 
+  // Restore focus after editing
   useEffect(() => {
     // If we just stopped editing and this cell is the active one,
     // return focus to the div so keyboard navigation continues working.
@@ -100,11 +102,14 @@ export const TableCell = memo(function TableCell({
     }
   };
 
+  // -----------------------------
+  // Editing state
+  // -----------------------------
   if (isEditing) {
     return (
       <input
         ref={inputRef}
-        className="w-full px-2 py-1 border border-blue-500 outline-none"
+        className="w-full px-2 py-1 border border-blue-500 outline-none ring-2 ring-blue-400"
         style={{ minWidth: 0 }}
         value={localValue}
         onChange={e => setLocalValue(e.target.value)}
@@ -120,23 +125,35 @@ export const TableCell = memo(function TableCell({
     else setIsEditing(true);   // enter edit if already active
   };
 
+  // -----------------------------
+  // Display state
+  // -----------------------------
   return (
-      <div
-        ref={divRef}
-        tabIndex={0}
-        className={`w-full px-2 py-1 truncate cursor-text hover:bg-gray-50 
-          ${isActive ? "outline outline-2 outline-blue-500" : "border"}`}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-      >
-        {value}
-      </div>
-    );
-  }, (prevProps, nextProps) => {
-    // CUSTOM COMPARISON: Only re-render if these specific things change
-    return (
-      prevProps.value === nextProps.value &&
-      prevProps.isActive === nextProps.isActive &&
-      prevProps.cellId === nextProps.cellId
-    );
-});
+    <div
+      ref={divRef}
+      tabIndex={0}
+      className={`
+        w-full h-full px-2 py-1 truncate cursor-text
+        outline-none
+        transition-colors
+
+        hover:bg-gray-100
+
+        ${isActive
+          ? "bg-blue-50 ring-2 ring-blue-400"
+          : "border border-transparent"}
+
+        focus:ring-2 focus:ring-blue-500
+      `}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      {value}
+    </div>
+  );
+}, (prev, next) =>
+  //Only re-render if these specific things change
+  prev.value === next.value &&
+  prev.isActive === next.isActive &&
+  prev.cellId === next.cellId
+);

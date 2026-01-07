@@ -37,7 +37,7 @@ type ActiveCell = {
   columnId: string;
 } | null;
 
-export function BaseTable() {
+export function BaseTable({ globalSearch }: { globalSearch: string }) {
   // --------------------------------------------
   // Core grid state (UI-owned, not TanStack-owned)
   // --------------------------------------------
@@ -293,8 +293,9 @@ export function BaseTable() {
   // --------------------------------------------
   return (
     <TableContext.Provider value={{ table, handleAddColumn, handleDeleteColumn, handleRenameColumn, handleAddRow, handleDeleteRow } as TableContextType<unknown>}>
-      <div ref={tableContainerRef} className="w-full overflow-x-auto border">
-        <div className="max-h-[calc(100vh-136px)] overflow-y-auto">
+      <div ref={tableContainerRef} style={{ overscrollBehavior: "contain" }} 
+        className="w-full overflow-x-auto border">
+        <div className="max-h-[calc(100vh-136px)] overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
           <table className="border-collapse table-auto w-max">
             <TableHeader />
             <TableBody />
