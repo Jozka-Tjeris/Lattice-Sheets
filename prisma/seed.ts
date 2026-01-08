@@ -28,7 +28,7 @@ async function main() {
   // 3. Create a table
   const table = await prisma.table.create({
     data: {
-      name: 'People',
+      name: 'Test table',
       baseId: base.id,
     },
   });
@@ -47,11 +47,11 @@ async function main() {
   })
 
   // 5. Create rows + cells
-  const ROW_COUNT = 100;
+  const ROW_COUNT = 10;
 
   for (let i = 0; i < ROW_COUNT; i++) {
     const row = await prisma.row.create({
-      data: { tableId: table.id },
+      data: { tableId: table.id, order: i+1 },
     });
 
     await prisma.cell.createMany({
