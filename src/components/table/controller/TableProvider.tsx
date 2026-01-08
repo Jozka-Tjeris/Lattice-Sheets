@@ -4,8 +4,11 @@ import React, { createContext, useContext, useState, useCallback, useMemo, type 
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getSortedRowModel, type ColumnDef,
   type SortingState, type ColumnFiltersState, type VisibilityState, type ColumnSizingState,
  } from "@tanstack/react-table";
-import type { Column, Row, CellMap, CellValue, TableRow } from "./tableTypes";
+import type { Column, Row, CellMap, CellValue, TableRow, ColumnType, CellKey } from "./tableTypes";
 import { TableCell } from "../TableCell";
+import { api as trpc } from "~/trpc/react";
+
+export const TEST_TABLE_ID = "cmk5beznr0002gartzrg6rpy3";
 
 export type TableProviderState = {
   rows: TableRow[];
@@ -19,9 +22,9 @@ export type TableProviderState = {
   registerRef: (id: string, el: HTMLDivElement | null) => void;
   updateCell: (rowId: string, columnId: string, value: CellValue) => void;
 
-  handleAddRow: (orderNum: number) => void;
+  handleAddRow: (orderNum: number, tableId: string) => void;
   handleDeleteRow: (rowId: string) => void;
-  handleAddColumn: () => void;
+  handleAddColumn: (tableId: string, label: string, type: ColumnType) => void;
   handleDeleteColumn: (columnId: string) => void;
   handleRenameColumn: (columnId: string, newLabel: string) => void;
 
@@ -65,6 +68,46 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   const [headerHeight, setHeaderHeight] = useState(40);
 
   // -----------------------
+  // tRPC mutations
+  // -----------------------
+  const updateCellsMutation = trpc.table.updateCells.useMutation({
+    // If mutation fails, rollback
+    onError: (error) => {
+      console.error("Failed to update cells:", error);
+    },
+  });
+
+  const addRowMutation = trpc.table.addRow.useMutation({
+    onError: (error) => {
+      console.error("Failed to add row:", error);
+    },
+  });
+
+  const deleteRowMutation = trpc.table.deleteRow.useMutation({
+    onError: (error) => {
+      console.error("Failed to delete row:", error);
+    },
+  });
+
+  const addColumnMutation = trpc.table.addColumn.useMutation({
+    onError: (error) => {
+      console.error("Failed to add column:", error);
+    },
+  });
+
+  const deleteColumnMutation = trpc.table.deleteColumn.useMutation({
+    onError: (error) => {
+      console.error("Failed to delete column:", error);
+    },
+  });
+
+  const renameColumnMutation = trpc.table.renameColumn.useMutation({
+    onError: (error) => {
+      console.error("Failed to rename column:", error);
+    },
+  });
+
+  // -----------------------
   // Cell refs for keyboard navigation
   // -----------------------
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -73,12 +116,74 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   }, []);
 
   // -----------------------
-  // Cell updates
+  // Batching for cell updates
   // -----------------------
-  const updateCell = useCallback((rowId: string, columnId: string, value: CellValue) => {
-    const key = `${rowId}:${columnId}`;
-    setCells(prev => ({ ...prev, [key]: value }));
-  }, []);
+  const pendingCellUpdatesRef = useRef<{ rowId: string; columnId: string; value: CellValue }[]>([]);
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Default debounce duration (ms)
+  const DEFAULT_BATCH_DELAY = 500;
+  const LONG_DELAY_AFTER_ROW_COL_OP = 3000;
+
+  // Flush pending updates to the server
+  const flushCellUpdates = useCallback(() => {
+    if (pendingCellUpdatesRef.current.length === 0) return;
+
+    // Capture pending updates
+    const updatesToSend = [...pendingCellUpdatesRef.current];
+    pendingCellUpdatesRef.current = [];
+
+    // Call the batch mutation
+    updateCellsMutation.mutate(updatesToSend);
+
+    batchTimerRef.current = null;
+  }, [updateCellsMutation]);
+
+  // Debounced updateCell
+  const updateCell = useCallback(
+    (rowId: string, columnId: string, value: CellValue) => {
+      const column = columns.find(col => col.id === columnId);
+      if (!column) return;
+
+      let newValue: string;
+      if (column.type === "number") {
+        const numericValue = Number(value);
+        if (isNaN(numericValue)) return;
+        newValue = numericValue.toString();
+      } else {
+        newValue = String(value);
+      }
+
+      const key = `${rowId}:${columnId}`;
+
+      // Update local state immediately
+      setCells(prev => ({ ...prev, [key]: newValue }));
+
+      // Queue for batch update
+      pendingCellUpdatesRef.current.push({ rowId, columnId, value: newValue });
+
+      // Debounce sending
+      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = setTimeout(flushCellUpdates, DEFAULT_BATCH_DELAY); // 500ms debounce
+    },
+    [columns, flushCellUpdates]
+  );
+
+  // Helper to delay flush after row/column ops
+  const scheduleLongFlush = useCallback(() => {
+    console.log("LONG SCHEDULE INIT");
+    if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    batchTimerRef.current = setTimeout(flushCellUpdates, LONG_DELAY_AFTER_ROW_COL_OP);
+  }, [flushCellUpdates]);
+
+  // Flush remaining updates on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingCellUpdatesRef.current.length > 0) {
+        flushCellUpdates();
+      }
+    };
+  }, [flushCellUpdates]);
 
   // -----------------------
   // Row operations
@@ -93,9 +198,13 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       });
       return updated;
     });
-  }, []);
+    deleteRowMutation.mutate({ rowId });
 
-  const handleAddRow = useCallback((orderNum: number) => {
+    //Delay flush to avoid Foreign Key violation issues
+    scheduleLongFlush();
+  }, [deleteRowMutation]);
+
+  const handleAddRow = useCallback((orderNum: number, tableId: string) => {
     const newId = `row-${crypto.randomUUID()}`;
     const newRow: TableRow = { id: newId, order: orderNum };
     setRows(prev => [...prev, newRow]);
@@ -106,14 +215,18 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       });
       return newCells;
     });
-  }, [columns]);
+    addRowMutation.mutate({ tableId, orderNum });
+
+    //Delay flush to avoid Foreign Key violation issues
+    scheduleLongFlush();
+  }, [columns, addRowMutation]);
 
   // -----------------------
   // Column operations
   // -----------------------
-  const handleAddColumn = useCallback(() => {
+  const handleAddColumn = useCallback((tableId: string, label: string, type: ColumnType) => {
     const newId = `col-${crypto.randomUUID()}`;
-    const newCol: Column = { id: newId, label: `Column ${columns.length + 1}`, type: "text" };
+    const newCol: Column = { id: newId, label: label, type: type };
     setColumns(prev => [...prev, newCol]);
 
     // initialize cells for new column
@@ -124,7 +237,11 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       });
       return newCells;
     });
-  }, [columns, rows]);
+    addColumnMutation.mutate({ tableId, label, type });
+
+    //Delay flush to avoid Foreign Key violation issues
+    scheduleLongFlush();
+  }, [columns, rows, addColumnMutation]);
 
   const handleDeleteColumn = useCallback((columnId: string) => {
     setColumns(prev => prev.filter(c => c.id !== columnId));
@@ -136,11 +253,16 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       });
       return updated;
     });
-  }, []);
+    deleteColumnMutation.mutate({ columnId });
+
+    //Delay flush to avoid Foreign Key violation issues
+    scheduleLongFlush();
+  }, [deleteColumnMutation]);
 
   const handleRenameColumn = useCallback((columnId: string, newLabel: string) => {
     setColumns(prev => prev.map(c => c.id === columnId ? { ...c, label: newLabel } : c));
-  }, []);
+    renameColumnMutation.mutate({ columnId, newLabel });
+  }, [renameColumnMutation]);
 
   // Focus active cell
   useEffect(() => {
@@ -209,6 +331,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
             value={cells[cellKey] ?? ""}
             rowId={rowId}
             columnId={columnId}
+            columnType={col.type}
             onClick={() => setActiveCell({ rowId, columnId })}
             onChange={value => updateCell(rowId, columnId, value)}
             registerRef={registerRef}

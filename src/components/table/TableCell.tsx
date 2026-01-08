@@ -8,6 +8,7 @@ type TableCellProps = {
   onChange: (newValue: CellValue) => void;
   onClick: () => void; // notify parent that this cell is active
   columnId: string;
+  columnType: "text" | "number";
   rowId: string;
   cellId: string;
   registerRef?: (id: string, el: HTMLDivElement | null) => void;
@@ -19,6 +20,7 @@ export const TableCell = memo(function TableCell({
   onClick,
   rowId,
   columnId,
+  columnType,
   cellId,
   registerRef
 }: TableCellProps) {
@@ -57,7 +59,20 @@ export const TableCell = memo(function TableCell({
   const commit = () => {
     if (!isEditing) return;
     setIsEditing(false);
-    if (localValue !== value) onChange(localValue);
+
+    let finalValue: CellValue = localValue;
+
+    if (columnType === "number") {
+      const num = Number(localValue);
+      if (isNaN(num)) {
+        // Reset to previous value if invalid
+        setLocalValue(value as string);
+        return;
+      }
+      finalValue = num;
+    }
+
+    if (finalValue !== value) onChange(finalValue);
   };
 
   const cancel = () => {
@@ -117,7 +132,17 @@ export const TableCell = memo(function TableCell({
         className="w-full h-full px-2 py-1 border border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.5)] z-10 relative"
         style={{ minWidth: 0 }}
         value={localValue}
-        onChange={e => setLocalValue(e.target.value)}
+        onChange={e => {
+          const val = e.target.value;
+          if (columnType === "number") {
+            // Only allow digits, optional decimal point, optional negative sign
+            if (/^-?\d*\.?\d*$/.test(val)) {
+              setLocalValue(val);
+            }
+          } else {
+            setLocalValue(val);
+          }
+        }}
         // onBlur={commit}
         onKeyDown={handleKeyDown}
         autoFocus

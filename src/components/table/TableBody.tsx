@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { flexRender } from "@tanstack/react-table";
-import { useTableController } from "@/components/table/controller/TableProvider";
+import { TEST_TABLE_ID, useTableController } from "@/components/table/controller/TableProvider";
 import type { TableRow } from "./controller/tableTypes";
 
 /**
@@ -48,7 +48,7 @@ export function TableBody() {
           <tr className="bg-gray-50">
             <td colSpan={columns.length || 1} className="px-4 py-2 text-center">
               <button
-                onClick={() => handleAddRow(rows.length)}
+                onClick={() => handleAddRow(rows.length + 1, TEST_TABLE_ID)}
                 className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
               >
                 + Add Row
@@ -93,7 +93,7 @@ export function TableBody() {
       <tr className="bg-gray-50">
         <td colSpan={columns.length || 1} className="px-4 py-2 text-center">
           <button
-            onClick={() => handleAddRow(rows.length)}
+            onClick={() => handleAddRow(rows.length + 1, TEST_TABLE_ID)}
             className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
           >
             + Add Row

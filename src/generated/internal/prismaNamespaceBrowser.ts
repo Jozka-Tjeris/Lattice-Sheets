@@ -177,6 +177,7 @@ export type ColumnScalarFieldEnum = (typeof ColumnScalarFieldEnum)[keyof typeof 
 
 export const RowScalarFieldEnum = {
   id: 'id',
+  order: 'order',
   tableId: 'tableId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

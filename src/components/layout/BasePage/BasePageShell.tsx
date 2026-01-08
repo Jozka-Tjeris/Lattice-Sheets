@@ -1,13 +1,42 @@
+"use client"
+
 import { LeftBar } from "./LeftBar";
 import { TopBar } from "./TopBar";
 import { TableSelectionBar } from "./TableSelectionBar";
 import { GridViewBar } from "./GridViewBar";
 import { ViewSelectorBar } from "./ViewSelectorBar";
 import { MainContent } from "./MainContent";
-import { TableProvider } from "~/components/table/controller/TableProvider";
-import { columns as initialColumns, rows as initialRows, cells as initialCells } from "~/components/table/model/mockData";
+import { TableProvider, TEST_TABLE_ID } from "~/components/table/controller/TableProvider";
+import { api as trpc } from "~/trpc/react";
+import type { CellMap, ColumnType } from "~/components/table/controller/tableTypes";
 
 export function BasePageShell() {
+  const rowsQuery = trpc.table.getRowsWithCells.useQuery({ tableId: TEST_TABLE_ID });
+  const columnsQuery = trpc.table.getColumns.useQuery({ tableId: TEST_TABLE_ID });
+
+  if (rowsQuery.isLoading || columnsQuery.isLoading) {
+    return <div>Loading table…</div>;
+  }
+
+  if (!rowsQuery.data || !columnsQuery.data) {
+    return <div>Failed to load table</div>;
+  }
+
+  const backendCells = rowsQuery.data.cells;
+
+  const initialRows = rowsQuery.data.rows.map((row, index) => ({
+    id: row.id,
+    order: index,
+  }))
+
+  const initialCells = backendCells as CellMap;
+
+  const initialColumns = columnsQuery.data.columns.map((col) => ({
+    id: col.id,
+    label: col.name,
+    type: col.type as ColumnType
+  }))
+
   return <TableProvider
       initialRows={initialRows}
       initialColumns={initialColumns}
