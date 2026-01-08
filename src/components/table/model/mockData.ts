@@ -2,9 +2,9 @@ import type { CellMap, Column, TableRow } from "../controller/tableTypes";
 
 
 export const columns: Column[] = [
-  { id: "name",   label: "Name",   type: "text",   width: 200 },
-  { id: "status", label: "Status", type: "text",   width: 150 },
-  { id: "owner",  label: "Owner",  type: "text",   width: 150 },
+  { id: "name",   label: "Name",   order: 1, type: "text",   width: 200 },
+  { id: "status", label: "Status", order: 2, type: "text",   width: 150 },
+  { id: "owner",  label: "Owner",  order: 3, type: "text",   width: 150 },
 ];
 
 export const rows: TableRow[] = Array.from({ length: 3 }, (_, i) => ({
