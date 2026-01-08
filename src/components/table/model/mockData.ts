@@ -7,7 +7,7 @@ export const columns: Column[] = [
   { id: "owner",  label: "Owner",  type: "text",   width: 150 },
 ];
 
-export const rows: TableRow[] = Array.from({ length: 25 }, (_, i) => ({
+export const rows: TableRow[] = Array.from({ length: 3 }, (_, i) => ({
   id: `row-${i}`,
   order: i
 }));

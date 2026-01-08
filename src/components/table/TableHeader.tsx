@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { flexRender } from "@tanstack/react-table";
 import { useTableController } from "@/components/table/controller/TableProvider";
 
