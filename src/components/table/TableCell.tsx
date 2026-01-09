@@ -60,7 +60,9 @@ export const TableCell = memo(function TableCell({
   // Focus management
   useEffect(() => {
     if (!isEditing && isActive) {
-      containerRef.current?.focus();
+      requestAnimationFrame(() => {
+        containerRef.current?.focus();
+      });
     }
   }, [isActive, isEditing]);
 

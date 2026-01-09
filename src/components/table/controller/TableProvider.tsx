@@ -16,23 +16,19 @@ export type TableProviderState = {
   cells: CellMap;
   activeCell: { rowId: string; columnId: string } | null;
   globalSearch: string;
-
   setActiveCell: (cell: { rowId: string; columnId: string } | null) => void;
   setGlobalSearch: (search: string) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
   updateCell: (rowId: string, columnId: string, value: CellValue) => void;
-
   handleAddRow: (orderNum: number, tableId: string) => void;
   handleDeleteRow: (rowId: string, tableId: string) => void;
   handleAddColumn: (orderNum: number, tableId: string, label: string, type: ColumnType) => void;
   handleDeleteColumn: (columnId: string, tableId: string) => void;
   handleRenameColumn: (columnId: string, newLabel: string, tableId: string) => void;
-
   sorting: SortingState;
   columnFilters: ColumnFiltersState;
   columnSizing: ColumnSizingState;
   table: ReturnType<typeof useReactTable>;
-
   headerHeight: number;
   setHeaderHeight: (height: number) => void;
 };
@@ -54,438 +50,197 @@ type TableProviderProps = {
 };
 
 export function TableProvider({ children, initialRows, initialColumns, initialCells, initialGlobalSearch = "" }: TableProviderProps) {
-  const [rows, setRows] = useState<TableRow[]>(initialRows);
-  const [columns, setColumns] = useState<Column[]>(initialColumns);
+  // 1. Initialize with stable internal IDs
+  const [rows, setRows] = useState<TableRow[]>(() => initialRows.map(r => ({ ...r, internalId: r.id })));
+  const [columns, setColumns] = useState<Column[]>(() => initialColumns.map(c => ({ ...c, internalId: c.id })));
   const [cells, setCells] = useState<CellMap>(initialCells);
+  
   const [activeCell, setActiveCell] = useState<{ rowId: string; columnId: string } | null>(null);
   const [globalSearch, setGlobalSearch] = useState<string>(initialGlobalSearch);
-
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-
   const [headerHeight, setHeaderHeight] = useState(40);
+
   const structureMutationInFlightRef = useRef(0);
-
-  const beginStructureMutation = () => {
-    structureMutationInFlightRef.current += 1;
-  };
-
-  const endStructureMutation = () => {
-    structureMutationInFlightRef.current -= 1;
-  };
-
-  // -----------------------
-  // tRPC mutations
-  // -----------------------
-  const updateCellsMutation = trpc.table.updateCells.useMutation({
-    // If mutation fails, rollback
-    onError: (error) => {
-      console.error("Failed to update cells:", error);
-    },
-  });
-
-  const addRowMutation = trpc.table.addRow.useMutation({
-    onSuccess: ({ row, optimisticId }) => {
-      // 1. Replace row ID
-      setRows(prev =>
-        prev.map(r => r.id === optimisticId ? {...row, optimistic: false } : r)
-      );
-
-      // 2. Replace cell keys
-      setCells(prev => {
-        const next: CellMap = {};
-        for (const [key, value] of Object.entries(prev)) {
-          const [rId, colId] = key.split(":");
-          const newRowId = rId === optimisticId ? row.id : rId;
-          next[`${newRowId}:${colId}`] = value;
-        }
-        return next;
-      });
-    },
-    onError: (error, { optimisticId }) => {
-      console.error("Failed to add row:", error);
-      setRows(prev => prev.filter(r => r.id !== optimisticId));
-    },
-  });
-
-  const deleteRowMutation = trpc.table.deleteRow.useMutation({
-    onError: (error) => {
-      console.error("Failed to delete row:", error);
-    },
-  });
-
-  const addColumnMutation = trpc.table.addColumn.useMutation({
-    onSuccess: ({ column, optimisticId }) => {
-      // 1. Replace column ID
-      setColumns(prev => prev.map(c => c.id === optimisticId ? { id: column.id, label: column.name, 
-        type: column.type as ColumnType, order: column.order, optimistic: false } : c));
-
-      // 2. Replace column IDs inside cell keys
-      setCells(prev => {
-        const next: CellMap = {};
-        for (const [key, value] of Object.entries(prev)) {
-          const [rowId, colId] = key.split(":");
-          const newColId = colId === optimisticId ? column.id : colId;
-          next[`${rowId}:${newColId}`] = value;
-        }
-        return next;
-      });
-    },
-
-    onError: (error, { optimisticId }) => {
-      console.error("Failed to add column:", error);
-      // rollback optimistic column
-      setColumns(prev => prev.filter(c => c.id !== optimisticId));
-      setCells(prev => {
-        const next: CellMap = {};
-        for (const [key, value] of Object.entries(prev)) {
-          const [, colId] = key.split(":");
-          if (colId !== optimisticId) next[key] = value;
-        }
-        return next;
-      });
-    },
-  });
-
-
-  const deleteColumnMutation = trpc.table.deleteColumn.useMutation({
-    onError: (error) => {
-      console.error("Failed to delete column:", error);
-    },
-  });
-
-  const renameColumnMutation = trpc.table.renameColumn.useMutation({
-    onError: (error) => {
-      console.error("Failed to rename column:", error);
-    },
-  });
-
-  // -----------------------
-  // Cell refs for keyboard navigation
-  // -----------------------
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
     cellRefs.current[id] = el;
   }, []);
 
   // -----------------------
-  // Batching for cell updates
+  // tRPC mutations
   // -----------------------
-  const pendingCellUpdatesRef = useRef<{ rowId: string; columnId: string; value: CellValue }[]>([]);
-  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const updateCellsMutation = trpc.table.updateCells.useMutation();
 
-  // Default debounce duration (ms)
-  const DEFAULT_BATCH_DELAY = 500;
-
-  // Flush pending updates to the server
-  const flushCellUpdates = useCallback(() => {
-    if (pendingCellUpdatesRef.current.length === 0) return;
-
-    //Do NOT flush if structure mutation is active
-    if (structureMutationInFlightRef.current > 0) {
-      return;
-    }
-
-    // Capture pending updates
-    const updatesToSend = [...pendingCellUpdatesRef.current];
-    pendingCellUpdatesRef.current = [];
-
-    // Call the batch mutation
-    updateCellsMutation.mutate(updatesToSend);
-
-    batchTimerRef.current = null;
-  }, [updateCellsMutation]);
-
-  // Debounced updateCell
-  const updateCell = useCallback(
-    (rowId: string, columnId: string, value: CellValue) => {
-      const column = columns.find(col => col.id === columnId);
-      if (!column) return;
-
-      let newValue: string;
-      if (column.type === "number") {
-        const numericValue = Number(value);
-        if (isNaN(numericValue)) return;
-        newValue = numericValue.toString();
-      } else {
-        newValue = String(value);
-      }
-
-      const key = `${rowId}:${columnId}`;
-
-      // Update local state immediately
-      setCells(prev => ({ ...prev, [key]: newValue }));
-
-      // Queue for batch update
-      pendingCellUpdatesRef.current.push({ rowId, columnId, value: newValue });
-      // Debounce sending
-      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
-      batchTimerRef.current = setTimeout(flushCellUpdates, DEFAULT_BATCH_DELAY); // 500ms debounce
+  const addRowMutation = trpc.table.addRow.useMutation({
+    onSuccess: ({ row, optimisticId }) => {
+      setRows(prev => prev.map(r => 
+        r.id === optimisticId ? { ...row, internalId: optimisticId, optimistic: false } : r
+      ));
+      // NO LONGER NEEDED: Rewriting all cell keys is unnecessary because we kept internalId stable!
     },
-    [columns, flushCellUpdates]
-  );
+    onError: (_, { optimisticId }) => {
+      setRows(prev => prev.filter(r => r.id !== optimisticId));
+    },
+  });
 
-  // Flush remaining updates on unmount
-  useEffect(() => {
-    return () => {
-      if (pendingCellUpdatesRef.current.length > 0) {
-        flushCellUpdates();
-      }
-    };
-  }, [flushCellUpdates]);
+  const addColumnMutation = trpc.table.addColumn.useMutation({
+    onSuccess: ({ column, optimisticId }) => {
+      setColumns(prev => prev.map(c => 
+        c.id === optimisticId 
+          ? { id: column.id, internalId: optimisticId, label: column.name, type: column.type as ColumnType, order: column.order, optimistic: false } 
+          : c
+      ));
+    },
+    onError: (_, { optimisticId }) => {
+      setColumns(prev => prev.filter(c => c.id !== optimisticId));
+    },
+  });
+
+  const deleteRowMutation = trpc.table.deleteRow.useMutation();
+  const deleteColumnMutation = trpc.table.deleteColumn.useMutation();
+  const renameColumnMutation = trpc.table.renameColumn.useMutation();
 
   // -----------------------
-  // Row operations
+  // Cell updates
   // -----------------------
-  const handleDeleteRow = useCallback((rowId: string, tableId: string) => {
-    beginStructureMutation();
+  const updateCell = useCallback((stableRowId: string, stableColumnId: string, value: CellValue) => {
+    // Find actual IDs for the API call
+    const actualRow = rows.find(r => r.internalId === stableRowId || r.id === stableRowId);
+    const actualCol = columns.find(c => c.internalId === stableColumnId || c.id === stableColumnId);
+    if (!actualCol) return;
 
-    setRows(prev => prev.filter(r => r.id !== rowId));
-    setCells(prev => {
-      const updated: CellMap = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const [rId] = key.split(":");
-        if (rId !== rowId) updated[key] = value;
-      });
-      return updated;
-    });
+    const key = `${stableRowId}:${stableColumnId}`;
+    setCells(prev => ({ ...prev, [key]: value }));
 
-    // Remove pending updates for this row to prevent ghosts
-    pendingCellUpdatesRef.current = pendingCellUpdatesRef.current.filter(u => u.rowId !== rowId);
+    updateCellsMutation.mutate([{
+      rowId: actualRow?.id ?? stableRowId,
+      columnId: actualCol?.id ?? stableColumnId,
+      value: String(value)
+    }]);
+  }, [columns, rows, updateCellsMutation]);
 
-    deleteRowMutation.mutate(
-      { tableId, rowId },
-      {
-        onSettled: () => {
-          endStructureMutation();
-          flushCellUpdates();
-        }
-      }
-    );
-  }, [deleteRowMutation, endStructureMutation, flushCellUpdates]);
-
+  // -----------------------
+  // Structural Operations
+  // -----------------------
   const handleAddRow = useCallback((orderNum: number, tableId: string) => {
-    beginStructureMutation();
-
     const optimisticId = `optimistic-row-${crypto.randomUUID()}`;
-    const newRow: TableRow = { id: optimisticId, order: orderNum, optimistic: true };
+    setRows(prev => [...prev, { id: optimisticId, internalId: optimisticId, order: orderNum, optimistic: true }]);
+    addRowMutation.mutate({ tableId, orderNum, optimisticId });
+  }, [addRowMutation]);
 
-    setRows(prev => [...prev, newRow]);
-    setCells(prev => {
-      const newCells = { ...prev };
-      columns.forEach(col => {
-        newCells[`${optimisticId}:${col.id}`] = "";
-      });
-      return newCells;
-    });
-
-    // Remove any pending cell updates for this new row (safety)
-    pendingCellUpdatesRef.current = pendingCellUpdatesRef.current.filter(u => u.rowId !== optimisticId);
-
-    addRowMutation.mutate(
-      { tableId, orderNum, optimisticId },
-      {
-        onSettled: () => {
-          endStructureMutation();
-          flushCellUpdates();
-        }
-      }
-    );
-  }, [columns, addRowMutation, endStructureMutation, flushCellUpdates]);
-
-  // -----------------------
-  // Column operations
-  // -----------------------
   const handleAddColumn = useCallback((orderNum: number, tableId: string, label: string, type: ColumnType) => {
-    beginStructureMutation();
-
     const optimisticId = `optimistic-col-${crypto.randomUUID()}`;
-    const newCol: Column = { id: optimisticId, label: label, order: orderNum, type: type, optimistic: true };
-    setColumns(prev => [...prev, newCol]);
+    setColumns(prev => [...prev, { id: optimisticId, internalId: optimisticId, label, order: orderNum, type, optimistic: true }]);
+    addColumnMutation.mutate({ tableId, label, orderNum, type, optimisticId });
+  }, [addColumnMutation]);
 
-    // initialize cells for new column
-    setCells(prev => {
-      const newCells = { ...prev };
-      rows.forEach(row => {
-        newCells[`${row.id}:${optimisticId}`] = "";
-      });
-      return newCells;
-    });
-
-    // Remove pending updates for this column (safety)
-    pendingCellUpdatesRef.current = pendingCellUpdatesRef.current.filter(u => u.columnId !== optimisticId);
-
-    addColumnMutation.mutate(
-      { tableId, label, orderNum, type, optimisticId },
-      {
-        onSettled: () => {
-          endStructureMutation();
-          flushCellUpdates();
-        }
-      }
-    );
-  }, [rows, addColumnMutation, endStructureMutation, flushCellUpdates]);
+  const handleDeleteRow = useCallback((rowId: string, tableId: string) => {
+    setRows(prev => prev.filter(r => r.id !== rowId && r.internalId !== rowId));
+    deleteRowMutation.mutate({ tableId, rowId });
+  }, [deleteRowMutation]);
 
   const handleDeleteColumn = useCallback((columnId: string, tableId: string) => {
-    beginStructureMutation();
-
-    setColumns(prev => prev.filter(c => c.id !== columnId));
-    setCells(prev => {
-      const updated: CellMap = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const [, colId] = key.split(":");
-        if (colId !== columnId) updated[key] = value;
-      });
-      return updated;
-    });
-
-    // Remove pending updates for this column
-    pendingCellUpdatesRef.current = pendingCellUpdatesRef.current.filter(u => u.columnId !== columnId);
-
-    deleteColumnMutation.mutate(
-      { tableId, columnId },
-      {
-        onSettled: () => {
-          endStructureMutation();
-          flushCellUpdates();
-        }
-      }
-    );
-
-  }, [deleteColumnMutation, endStructureMutation, flushCellUpdates]);
+    setColumns(prev => prev.filter(c => c.id !== columnId && c.internalId !== columnId));
+    deleteColumnMutation.mutate({ tableId, columnId });
+  }, [deleteColumnMutation]);
 
   const handleRenameColumn = useCallback((columnId: string, newLabel: string, tableId: string) => {
-    setColumns(prev => prev.map(c => c.id === columnId ? { ...c, label: newLabel } : c));
+    setColumns(prev => prev.map(c => (c.id === columnId || c.internalId === columnId) ? { ...c, label: newLabel } : c));
     renameColumnMutation.mutate({ tableId, columnId, newLabel });
   }, [renameColumnMutation]);
 
-  // Focus active cell
-  useEffect(() => {
-    if (!activeCell) return;
-    const key = `${activeCell.rowId}:${activeCell.columnId}`;
-    const el = cellRefs.current[key];
-    const isTyping = document.activeElement?.tagName === 'INPUT';
-    if (el && !isTyping && document.activeElement !== el) {
-      el.focus();
-    }
-  }, [activeCell]);
-
-  const handleSortingChange = useCallback((updaterOrValue: SetStateAction<SortingState>) => {
-    setSorting(updaterOrValue);
-    // This force-syncs the state update
-  }, []);
-
   // -----------------------
-  // Table instance
+  // Table Setup
   // -----------------------
-
-  // Sort rows by order
   const visibleRows = useMemo(() => [...rows].sort((a, b) => a.order - b.order), [rows]);
 
-  // Filter + search
   const tableData = useMemo(() => {
     const search = globalSearch.trim().toLowerCase();
     return visibleRows
       .filter(row => {
         if (!search) return true;
+        const rId = row.internalId ?? row.id;
         return columns.some(col => {
-          const value = cells[`${row.id}:${col.id}`];
+          const cId = col.internalId ?? col.id;
+          const value = cells[`${rId}:${cId}`];
           return value != null && String(value).toLowerCase().includes(search);
         });
       })
       .map((row, idx) => {
-        const record: Record<string, CellValue> = { id: row.id, order: idx };
+        const rId = row.internalId ?? row.id;
+        const record: any = { ...row, internalId: rId, order: idx };
         columns.forEach(col => {
-          record[col.id] = cells[`${row.id}:${col.id}`] ?? "";
+          const cId = col.internalId ?? col.id;
+          record[cId] = cells[`${rId}:${cId}`] ?? "";
         });
         return record;
       });
   }, [visibleRows, columns, cells, globalSearch]);
 
-  // Column defs for TanStack
-  const tableColumns: ColumnDef<unknown>[] = useMemo(() => {
-    return columns.map((col) => ({
-      id: col.id,
-      accessorKey: col.id,
-      header: col.label,
-      enableColumnFilter: true,
-      filterFn: col.type === "number" ? "inNumberRange" : "includesString",
-      size: col.width ?? 150,
-      minSize: 80,
-      maxSize: 300,
-      enableResizing: true,
-      cell: info => {
-        const rowElem = info.row.original as Row;
-        const rowId = rowElem.id;
-        const columnId = col.id;
-        const cellKey = `${rowId}:${columnId}`;
+  const tableColumns: ColumnDef<any>[] = useMemo(() => {
+    return columns.map((col) => {
+      const colId = col.internalId ?? col.id;
+      return {
+        id: colId,
+        accessorKey: colId,
+        header: col.label,
+        size: col.width ?? 150,
+        cell: info => {
+          const rowElem = info.row.original;
+          const rId = rowElem.internalId || rowElem.id;
+          const cellKey = `${rId}:${colId}`;
 
-        return (
-          <TableCell
-            cellId={cellKey}
-            value={cells[cellKey] ?? ""}
-            rowId={rowId}
-            columnId={columnId}
-            columnType={col.type}
-            onClick={() => setActiveCell({ rowId, columnId })}
-            onChange={value => updateCell(rowId, columnId, value)}
-            registerRef={registerRef}
-          />
-        );
-      }
-    }));
+          return (
+            <TableCell
+              cellId={cellKey}
+              value={cells[cellKey] ?? ""}
+              rowId={rId}
+              columnId={colId}
+              columnType={col.type}
+              onClick={() => setActiveCell({ rowId: rId, columnId: colId })}
+              onChange={value => updateCell(rId, colId, value)}
+              registerRef={registerRef}
+            />
+          );
+        }
+      };
+    });
   }, [columns, cells, updateCell, registerRef]);
 
-  // TanStack table instance
   const table = useReactTable({
     data: tableData,
     columns: tableColumns,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      columnSizing,
-    },
-    onSortingChange: handleSortingChange,
+    state: { sorting, columnFilters, columnVisibility, columnSizing },
+    onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getRowId: (row: any) => row.internalId || row.id, // CRITICAL: Stability anchor
     columnResizeMode: "onChange",
-    defaultColumn: { size: 150 },
   });
 
-  const contextValue = useMemo(() => ({
-    rows,
-    columns,
-    cells,
-    activeCell,
-    globalSearch,
-    setActiveCell,
-    setGlobalSearch,
-    registerRef,
-    updateCell,
-    handleAddRow,
-    handleDeleteRow,
-    handleAddColumn,
-    handleDeleteColumn,
-    handleRenameColumn,
-    table,
-    sorting,
-    columnFilters,
-    columnSizing,
-    headerHeight,
-    setHeaderHeight
-  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, table, sorting, headerHeight,
-    handleAddColumn, handleAddRow, handleDeleteColumn, handleDeleteRow, handleRenameColumn, registerRef, updateCell]);
+  // Focus effect
+  useEffect(() => {
+    if (!activeCell) return;
+    const el = cellRefs.current[`${activeCell.rowId}:${activeCell.columnId}`];
+    if (el && document.activeElement?.tagName !== 'INPUT' && document.activeElement !== el) {
+      el.focus();
+    }
+  }, [activeCell]);
 
-  return (
-    <TableContext.Provider value={contextValue}>
-      {children}
-    </TableContext.Provider>
-  );
+  const contextValue = useMemo(() => ({
+    rows, columns, cells, activeCell, globalSearch,
+    setActiveCell, setGlobalSearch, registerRef, updateCell,
+    handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn,
+    table, sorting, columnFilters, columnSizing, headerHeight, setHeaderHeight
+  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, table, sorting, headerHeight, registerRef, updateCell, handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn]);
+
+  return <TableContext.Provider value={contextValue}>{children}</TableContext.Provider>;
 }

@@ -11,12 +11,14 @@ export type Column = {
   type: ColumnType;
   width?: number;
   optimistic?: boolean;
+  internalId?: string;
 };
 
 export type Row = {
   id: string;
   order: number;
   optimistic?: boolean;
+  internalId?: string;
 };
 
 export type TableRow = Row;

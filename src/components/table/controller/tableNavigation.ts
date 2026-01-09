@@ -8,22 +8,32 @@ export function useMoveActiveCell() {
     (direction: "up" | "down" | "left" | "right") => {
       if (!activeCell) return;
 
-      const rowIndex = rows.findIndex(r => r.id === activeCell.rowId);
-      const colIndex = columns.findIndex(c => c.id === activeCell.columnId);
+      // 1. Find indices based on internalId (or fallback to id)
+      const rowIndex = rows.findIndex(r => (r.internalId ?? r.id) === activeCell.rowId);
+      const colIndex = columns.findIndex(c => (c.internalId ?? c.id) === activeCell.columnId);
 
-      let nextRow = rowIndex;
-      let nextCol = colIndex;
+      if (rowIndex === -1 || colIndex === -1) return;
+
+      let nextRowIdx = rowIndex;
+      let nextColIdx = colIndex;
 
       switch (direction) {
-        case "up": nextRow = Math.max(0, rowIndex - 1); break;
-        case "down": nextRow = Math.min(rows.length - 1, rowIndex + 1); break;
-        case "left": nextCol = Math.max(0, colIndex - 1); break;
-        case "right": nextCol = Math.min(columns.length - 1, colIndex + 1); break;
+        case "up": nextRowIdx = Math.max(0, rowIndex - 1); break;
+        case "down": nextRowIdx = Math.min(rows.length - 1, rowIndex + 1); break;
+        case "left": nextColIdx = Math.max(0, colIndex - 1); break;
+        case "right": nextColIdx = Math.min(columns.length - 1, colIndex + 1); break;
       }
 
-      if (nextRow === rowIndex && nextCol === colIndex) return;
+      if (nextRowIdx === rowIndex && nextColIdx === colIndex) return;
 
-      setActiveCell({ rowId: rows[nextRow]!.id, columnId: columns[nextCol]!.id });
+      const nextRow = rows[nextRowIdx]!;
+      const nextCol = columns[nextColIdx]!;
+
+      // 2. Set the active cell using the stable internalId
+      setActiveCell({ 
+        rowId: nextRow.internalId ?? nextRow.id, 
+        columnId: nextCol.internalId ?? nextCol.id 
+      });
     },
     [activeCell, rows, columns, setActiveCell]
   );
