@@ -27,11 +27,10 @@ export const TableCell = memo(function TableCell({
   const { activeCell, getIsStructureStable } = useTableController();
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value ?? "");
-  
-  const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- REFS FOR RELIABLE COMMITTING ---
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const localValueRef = useRef(localValue);
   const isEditingRef = useRef(isEditing);
   const isCommittingRef = useRef(false);
@@ -39,17 +38,17 @@ export const TableCell = memo(function TableCell({
 
   const isActive = activeCell?.rowId === rowId && activeCell?.columnId === columnId;
 
-  // Keep refs in sync with state
+  // Keep refs in sync
   useEffect(() => { localValueRef.current = localValue; }, [localValue]);
   useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
 
-  // Sync prop value to local state ONLY when not editing
+  // Sync prop value when NOT editing
   useEffect(() => {
-    if (!isEditing) {
+    if (!isEditingRef.current) {
       setLocalValue(value ?? "");
       localValueRef.current = value ?? "";
     }
-  }, [value, isEditing]);
+  }, [value]);
 
   // Register for navigation
   useEffect(() => {
@@ -59,38 +58,30 @@ export const TableCell = memo(function TableCell({
 
   // Focus management
   useEffect(() => {
-    if (!isEditing && isActive) {
-      requestAnimationFrame(() => {
-        containerRef.current?.focus();
-      });
-    }
-  }, [isActive, isEditing]);
-
-  useEffect(() => {
     if (isEditing && inputRef.current) {
       const el = inputRef.current;
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
+    } else if (!isEditing && isActive) {
+      requestAnimationFrame(() => containerRef.current?.focus());
     }
-  }, [isEditing]);
+  }, [isEditing, isActive]);
 
-  // --- STABLE COMMIT LOGIC ---
+  // Commit logic
   const commit = useCallback(() => {
     if (!isEditingRef.current || isCommittingRef.current || isCancellingRef.current) return;
-    
+
     const valueToCommit = localValueRef.current;
     isCommittingRef.current = true;
 
     let finalValue: CellValue = valueToCommit;
     if (columnType === "number") {
-      //Handle empty input
       if (valueToCommit === "") {
         finalValue = "";
       } else {
-        //Only convert to Number if it's not empty
         const num = Number(valueToCommit);
         if (isNaN(num)) {
-          setLocalValue(value ?? ""); 
+          setLocalValue(value ?? "");
           setIsEditing(false);
           isCommittingRef.current = false;
           return;
@@ -102,95 +93,82 @@ export const TableCell = memo(function TableCell({
     if (finalValue !== value) {
       onChange(finalValue);
     }
-    
+
     setIsEditing(false);
     isCommittingRef.current = false;
   }, [columnType, value, onChange]);
 
   const cancel = useCallback(() => {
-    isCancellingRef.current = true; // Set the lock
+    isCancellingRef.current = true;
     setLocalValue(value ?? "");
     setIsEditing(false);
-    
-    // Reset the lock after the current execution cycle
-    setTimeout(() => {
-      isCancellingRef.current = false;
-    }, 0);
+    setTimeout(() => { isCancellingRef.current = false; }, 0);
   }, [value]);
 
-  // --- EVENT HANDLERS ---
+  // Key handling
   const moveActiveCell = useMoveActiveCell();
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement | HTMLInputElement>) => {
     if (!getIsStructureStable()) {
       e.preventDefault();
-      return; // ignore edits / navigation during structure mutations
+      return;
     }
     if (isEditing) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commit();
-      } 
-      else if (e.key === "Escape") {
-        e.preventDefault();
-        cancel(); 
-      } 
-      else if (e.key === "Tab") {
-        e.preventDefault();
-        commit();
-        if (e.shiftKey) moveActiveCell("left");
-        else moveActiveCell("right");
+      switch (e.key) {
+        case "Enter": e.preventDefault(); commit(); break;
+        case "Escape": e.preventDefault(); cancel(); break;
+        case "Tab":
+          e.preventDefault();
+          commit();
+          e.shiftKey ? moveActiveCell("left") : moveActiveCell("right");
+          break;
       }
     } else if (isActive) {
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) {
-        e.preventDefault();
-      }
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.key)) e.preventDefault();
       switch (e.key) {
-        case "Tab":
-          cancel();
-          if (e.shiftKey) moveActiveCell("left");
-          else moveActiveCell("right");
-          break;
-        case "Enter":
-          setIsEditing(true);
-          break;
+        case "Enter": setIsEditing(true); break;
+        case "Tab": cancel(); e.shiftKey ? moveActiveCell("left") : moveActiveCell("right"); break;
         case "ArrowRight": moveActiveCell("right"); break;
-        case "ArrowLeft":  moveActiveCell("left"); break;
-        case "ArrowUp":    moveActiveCell("up"); break;
-        case "ArrowDown":  moveActiveCell("down"); break;
+        case "ArrowLeft": moveActiveCell("left"); break;
+        case "ArrowUp": moveActiveCell("up"); break;
+        case "ArrowDown": moveActiveCell("down"); break;
       }
     }
   };
 
+  // Mouse click
   const handleMouseDown = () => {
-    if (isEditing) return; // Let input handle its own clicks
-    if (!isActive) {
-      onClick(); // Set active in Provider
-    } else {
-      setTimeout(() => setIsEditing(true), 0);
-    }
+    if (isEditing) return;
+    if (!isActive) onClick();
+    else setTimeout(() => setIsEditing(true), 0);
   };
 
-  // --- CLICK OUTSIDE & CLEANUP ---
+  useEffect(() => {
+    if (!isActive && isEditingRef.current) {
+      commit();
+    }
+  }, [isActive, commit]);
+
+  // Commit on outside click
   useEffect(() => {
     if (!isEditing) return;
-
     const handleGlobalClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        commit();
-      }
+     setTimeout(() => {
+        if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+          commit();
+        }
+      }, 0);
     };
-
     document.addEventListener("mousedown", handleGlobalClick);
-    return () => {
-      document.removeEventListener("mousedown", handleGlobalClick);
-      
-      // Check BOTH if we are editing AND that we aren't currently cancelling
-      if (isEditingRef.current && !isCancellingRef.current) {
-        commit();
-      }
-    };
+    return () => document.removeEventListener("mousedown", handleGlobalClick);
   }, [isEditing, commit]);
+
+  // Input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (columnType === "number") {
+      if (/^-?\d*\.?\d*$/.test(val)) setLocalValue(val);
+    } else setLocalValue(val);
+  };
 
   return (
     <div
@@ -198,7 +176,7 @@ export const TableCell = memo(function TableCell({
       data-cell-id={cellId}
       tabIndex={0}
       className={`
-        relative w-full h-full px-2 py-1 flex items-start
+        relative w-full h-full px-2 py-1 flex items-center
         cursor-text truncate transition-colors outline-none
         hover:bg-gray-100
         ${isActive
@@ -208,27 +186,23 @@ export const TableCell = memo(function TableCell({
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}
     >
-      <span className={`truncate ${isEditing ? 'invisible w-0' : 'w-full'}`}>
-        {value ?? ""}
-        {(value === null || value === "") && !isEditing && (
-          <span className="text-transparent select-none">.</span>
-        )}
-      </span>
-
-      {isEditing && (
-        <input
-          ref={inputRef}
-          value={localValue}
-          disabled={!getIsStructureStable()}
-          onChange={e => {
-            const val = e.target.value;
-            if (columnType === "number") {
-              if (/^-?\d*\.?\d*$/.test(val)) setLocalValue(val);
-            } else setLocalValue(val);
-          }}
-          className="w-full outline-none bg-transparent"
-        />
+      {/* Display value when not editing */}
+      {!isEditing && (
+        <span className="absolute inset-0 flex items-center px-2 truncate pointer-events-none select-none">
+          {value ?? ""}
+        </span>
       )}
+
+      {/* Input element (always present) */}
+      <input
+        ref={inputRef}
+        value={localValue}
+        disabled={!isEditing || !getIsStructureStable()}
+        onChange={handleInputChange}
+        className={`absolute inset-0 w-full h-full px-2 outline-none bg-transparent
+          ${!isEditing ? "opacity-0 pointer-events-none" : ""}
+        `}
+      />
     </div>
   );
 });
