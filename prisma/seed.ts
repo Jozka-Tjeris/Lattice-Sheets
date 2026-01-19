@@ -1,57 +1,71 @@
-import 'dotenv/config';
-import { PrismaClient } from '../src/generated/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
-import { faker } from '@faker-js/faker';
+import "dotenv/config";
+import { PrismaClient } from "../src/generated/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import { faker } from "@faker-js/faker";
+import { SEED_OWNER_ID } from "./seed.config";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  // 1. Create a user (normally NextAuth would do this)
-  const user = await prisma.user.create({
-    data: {
-      name: faker.person.fullName(),
-      email: faker.internet.email(),
-    },
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("❌ Seed script must not run in production");
+  }
+
+  if (!SEED_OWNER_ID) {
+    throw new Error("SEED_OWNER_ID is required for seeding");
+  }
+
+  // 1. Verify owner exists (fail fast)
+  const owner = await prisma.user.findUnique({
+    where: { id: SEED_OWNER_ID },
+    select: { id: true },
   });
 
-  // 2. Create a base
+  if (!owner) {
+    throw new Error(
+      `Seed owner not found. Did you log in at least once?\nID: ${SEED_OWNER_ID}`
+    );
+  }
+
+  // 2. Create base
   const base = await prisma.base.create({
     data: {
-      name: 'Demo Base',
-      ownerId: user.id,
+      name: "Demo Base",
+      ownerId: SEED_OWNER_ID,
     },
   });
 
-  // 3. Create a table
+  // 3. Create table
   const table = await prisma.table.create({
     data: {
-      name: 'Test table',
+      name: "Test table",
       baseId: base.id,
     },
   });
 
   // 4. Create columns
-  const nameColumn = await prisma.column.create({
-    data: { name: 'Name', columnType: 'text', order: 0, tableId: table.id },
-  })
-
-  const emailColumn = await prisma.column.create({
-    data: { name: 'Email', columnType: 'text', order: 1, tableId: table.id },
-  })
-
-  const ageColumn = await prisma.column.create({
-    data: { name: 'Age', columnType: 'number', order: 2, tableId: table.id },
-  })
+  const [nameColumn, emailColumn, ageColumn] = await Promise.all([
+    prisma.column.create({
+      data: { name: "Name", columnType: "text", order: 0, tableId: table.id },
+    }),
+    prisma.column.create({
+      data: { name: "Email", columnType: "text", order: 1, tableId: table.id },
+    }),
+    prisma.column.create({
+      data: { name: "Age", columnType: "number", order: 2, tableId: table.id },
+    }),
+  ]);
 
   // 5. Create rows + cells
   const ROW_COUNT = 10;
 
   for (let i = 0; i < ROW_COUNT; i++) {
     const row = await prisma.row.create({
-      data: { tableId: table.id, order: i+1 },
+      data: { tableId: table.id, order: i + 1 },
     });
 
     await prisma.cell.createMany({
@@ -75,17 +89,15 @@ async function main() {
     });
   }
 
-  console.log('Seed complete!');
+  console.log("✅ Seed complete!");
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error("❌ Seed failed:", e);
     process.exit(1);
   })
-  .finally( async () => {
-    await prisma.$disconnect()
-    await pool.end()
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
   });
-
-  // To run: npx tsx prisma/seed.ts

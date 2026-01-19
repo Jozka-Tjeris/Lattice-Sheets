@@ -47,3 +47,6 @@ yarn-error.log*
 
 # Prisma generated client
 /generated
+
+# Prisma owner ID
+/prisma/seed.config.ts
