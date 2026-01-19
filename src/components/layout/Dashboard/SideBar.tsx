@@ -1,5 +1,30 @@
+"use client"
+
+import { api as trpc } from "~/trpc/react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function Sidebar() {
+    const router = useRouter();
+    const utils = trpc.useUtils();
+    const [creating, setCreating] = useState(false);
+
+    const createBaseMutation = trpc.base.createBase.useMutation({
+        onSuccess: (newBase) => {
+        utils.base.listBases.invalidate(); // Refresh the base list
+        router.push(`/base/${newBase.id}`); // Redirect to the new base
+        },
+        onError: (err) => {
+        console.error("Failed to create base:", err);
+        setCreating(false);
+        },
+    });
+
+    const handleCreateBase = () => {
+        setCreating(true);
+        createBaseMutation.mutate({ name: "Untitled Base" });
+    };
+
     return <aside className="flex flex-col w-75 border-r p-4 gap-2 h-full">
         <div className="min-h-145">
             {/* <!-- Home link --> */}
@@ -29,17 +54,6 @@ export function Sidebar() {
                     </svg>
                 </button>
             </div>
-        
-            {/* <div className="overflow-y-auto">
-                <div className="flex items-center truncate w-full px-[6px] py-[6px]">
-                    <div className="flex items-center justify-center border rounded w-[30px] h-[30px] shrink-0">
-                    <svg width="16" height="16" viewBox="0 0 16 16" className="flex-none icon text-gray-400">
-                        <use fill="currentColor" href="/assets/icon_definitions.svg#Star"></use>
-                    </svg>
-                    </div>
-                    <p className="ml-[6px] text-sm text-gray-500 leading-[18px] text-wrap">Your starred bases, interfaces, and workspaces will appear here</p>
-                </div>
-            </div> */}
 
             {/* <!-- Shared --> */}
             <a href="" className="flex items-center hover:bg-gray-100 mb-[4px] rounded px-[6px] py-[6px]">
@@ -99,12 +113,18 @@ export function Sidebar() {
                 </svg>
                 Import
             </a>
-            <a href="base/1" className="w-full flex items-center justify-center px-[6px] py-[6px] bg-[#166ee1] text-white font-semibold rounded-lg shadow hover:shadow-lg mt-[8px] mb-[4px]" >
-                <svg width="16" height="16" className="flex-none mr-[4px]">
-                    <use fill="currentColor" href="/assets/icon_definitions.svg#Plus"></use>
+            <div>
+                <button
+                onClick={handleCreateBase}
+                disabled={creating}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+                >
+                <svg width="16" height="16" className="flex-none">
+                    <use fill="currentColor" href="/assets/icon_definitions.svg#Plus" />
                 </svg>
-                Create
-            </a>
+                {creating ? "Creating…" : "Create Base"}
+                </button>
+            </div>
         </div>
     </aside>
 }

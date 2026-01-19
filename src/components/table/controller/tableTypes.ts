@@ -45,6 +45,14 @@ export type CellAddress = {
   columnId: string;
 };
 
+export type TableData = {
+  baseId: string;
+  name: string;
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Helpers
 export function toCellKey(address: CellAddress): CellKey {
   return `${address.rowId}:${address.columnId}`;

@@ -94,6 +94,26 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
     Array<{ rowId: string; columnId: string; value: CellValue; tableId: string; }>
   >([]);
 
+  // Data update effects (refresh data states once tRPC data comes in)
+  useEffect(() => {
+    if (initialRows.length > 0) {
+      setRows(initialRows.map(r => createTableRow({ ...r, internalId: r.id })));
+    }
+  }, [initialRows]);
+
+  useEffect(() => {
+    if (initialColumns.length > 0) {
+      setColumns(initialColumns.map(c => ({ ...c, internalId: c.id, columnType: c.columnType })));
+    }
+  }, [initialColumns]);
+
+  useEffect(() => {
+    if (Object.keys(initialCells).length > 0) {
+      setCells(initialCells);
+    }
+  }, [initialCells]);
+
+
   // -----------------------
   // tRPC mutations
   // -----------------------
