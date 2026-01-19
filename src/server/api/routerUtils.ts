@@ -18,7 +18,7 @@ export function normalizeCells(cells: { rowId: string; columnId: string; value: 
 export async function withTableLock<T>(
   tx: Prisma.TransactionClient,
   tableId: string,
-  fn: () => Promise<T>
+  fn: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
   await tx.$executeRaw`
     SELECT 1 FROM "Table"
@@ -26,9 +26,10 @@ export async function withTableLock<T>(
     FOR UPDATE
   `;
 
-  return fn();
+  return fn(tx);
 }
 
+// Use this for read-only queries
 export async function assertTableAccess(
   ctx: Context,
   tableId: string
@@ -49,4 +50,18 @@ export async function assertTableAccess(
   }
 
   return table;
+}
+
+// Use this for mutations
+export async function withAuthorizedTableLock<T>(
+  ctx: Context,
+  tableId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>
+) {
+  // tx here is created automatically by ctx.db.$transaction, same API as ctx.db
+  return ctx.db.$transaction(async (tx) => {
+    // Asserts appropriate table access and locks table upon success
+    await assertTableAccess(ctx, tableId);
+    return withTableLock(tx, tableId, fn);
+  });
 }

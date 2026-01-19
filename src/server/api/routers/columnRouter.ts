@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { withTableLock } from "../routerUtils";
+import { assertTableAccess, withAuthorizedTableLock, withTableLock } from "../routerUtils";
 
 export const columnRouter = createTRPCRouter({
   getColumns: protectedProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertTableAccess(ctx, input.tableId);
+
       const columns = await ctx.db.column.findMany({ where: { tableId: input.tableId }, orderBy: { order: "asc" } });
       return { columns };
   }),
@@ -19,7 +21,7 @@ export const columnRouter = createTRPCRouter({
       orderNum: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.db.$transaction(async (tx) => {
+      const result = await withAuthorizedTableLock(ctx, input.tableId, async (tx) => {
         return withTableLock(tx, input.tableId, async () => {
           // 1. Create column
           const newColumn = await tx.column.create({
@@ -57,8 +59,7 @@ export const columnRouter = createTRPCRouter({
   deleteColumn: protectedProcedure
     .input(z.object({ tableId: z.string(), columnId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.$transaction(async (tx) => {
-        await withTableLock(tx, input.tableId, async () => {
+      await withAuthorizedTableLock(ctx, input.tableId, async (tx) => {
           await tx.cell.deleteMany({
             where: { columnId: input.columnId },
           });
@@ -66,7 +67,6 @@ export const columnRouter = createTRPCRouter({
           await tx.column.delete({
             where: { id: input.columnId },
           });
-        });
       });
 
       return { columnId: input.columnId };
@@ -75,8 +75,8 @@ export const columnRouter = createTRPCRouter({
   renameColumn: protectedProcedure
     .input(z.object({ tableId: z.string(), columnId: z.string(), newLabel: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return withTableLock(ctx.db, input.tableId, async () => {
-        const column = await ctx.db.column.update({
+      return withAuthorizedTableLock(ctx, input.tableId, async(tx) => {
+        const column = await tx.column.update({
           where: { id: input.columnId, tableId: input.tableId },
           data: { name: input.newLabel },
         });

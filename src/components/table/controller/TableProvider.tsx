@@ -20,7 +20,7 @@ export type TableProviderState = {
   setActiveCell: (cell: { rowId: string; columnId: string } | null) => void;
   setGlobalSearch: (search: string) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
-  updateCell: (rowId: string, columnId: string, value: CellValue) => void;
+  updateCell: (tableId: string, rowId: string, columnId: string, value: CellValue) => void;
   handleAddRow: (orderNum: number, tableId: string) => void;
   handleDeleteRow: (rowId: string, tableId: string) => void;
   handleAddColumn: (orderNum: number, tableId: string, label: string, type: ColumnType) => void;
@@ -91,7 +91,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   const getIsStructureStable = useCallback(() => structureMutationInFlightRef.current === 0, []);
 
   const pendingCellUpdatesRef = useRef<
-    Array<{ rowId: string; columnId: string; value: CellValue }>
+    Array<{ rowId: string; columnId: string; value: CellValue; tableId: string; }>
   >([]);
 
   // -----------------------
@@ -143,7 +143,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   // -----------------------
   // Cell updates
   // -----------------------
-  const updateCell = useCallback((stableRowId: string, stableColumnId: string, value: CellValue) => {
+  const updateCell = useCallback((tableId: string, stableRowId: string, stableColumnId: string, value: CellValue) => {
     const key = `${stableRowId}:${stableColumnId}`;
     setCells(prev => ({ ...prev, [key]: value }));
     const actualRow = rows.find(r => r.internalId === stableRowId || r.id === stableRowId);
@@ -154,6 +154,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
       rowId: actualRow?.id ?? stableRowId,
       columnId: actualCol?.id ?? stableColumnId,
       value: String(value),
+      tableId: tableId,
     };
 
     pendingCellUpdatesRef.current.push(payload);
@@ -267,7 +268,7 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
               columnId={colId}
               columnType={resolvedType}
               onClick={() => setActiveCell({ rowId: rId, columnId: colId })}
-              onChange={value => updateCell(rId, colId, value)}
+              onChange={value => updateCell(TEST_TABLE_ID, rId, colId, value)}
               registerRef={registerRef}
             />
           );

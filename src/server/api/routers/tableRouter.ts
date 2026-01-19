@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { assertTableAccess, withAuthorizedTableLock } from "../routerUtils";
 
 export const tableRouter = createTRPCRouter({
   getTable: protectedProcedure
     .input(z.object({ tableId: z.string() }))
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTableAccess(ctx, input.tableId);
+
       const table = ctx.db.table.findUnique({ where: { id: input.tableId } });
       return { table };
   }),
@@ -81,7 +84,7 @@ export const tableRouter = createTRPCRouter({
   deleteTable: protectedProcedure
     .input(z.object({ tableId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.$transaction(async (tx) => {
+      return withAuthorizedTableLock(ctx, input.tableId, async (tx) => {
         const table = await tx.table.findFirst({
           where: {
             id: input.tableId,
