@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { assertTableAccess, normalizeCells, withAuthorizedTableLock, withTableLock } from "../routerUtils";
+import { assertTableAccess, normalizeCells, withAuthorizedTableLock } from "../routerUtils";
 
 export const rowRouter = createTRPCRouter({
   getRowsWithCells: protectedProcedure
@@ -49,7 +49,7 @@ export const rowRouter = createTRPCRouter({
   deleteRow: protectedProcedure
     .input(z.object({ tableId: z.string(), rowId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      withAuthorizedTableLock(ctx, input.tableId, async(tx) => {
+      await withAuthorizedTableLock(ctx, input.tableId, async(tx) => {
         await tx.cell.deleteMany({
           where: { rowId: input.rowId },
         });
