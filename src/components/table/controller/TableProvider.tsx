@@ -33,6 +33,7 @@ export type TableProviderState = {
   headerHeight: number;
   setHeaderHeight: (height: number) => void;
   getIsStructureStable: () => boolean;
+  isNumericalValue: (val: string) => boolean;
 };
 
 const TableContext = createContext<TableProviderState | undefined>(undefined);
@@ -75,6 +76,11 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
 
   const structureMutationInFlightRef = useRef(0);
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const isNumericalValue = useCallback((val: string) => {
+    // Start with optional - sign, then any number of digits, then an optional . sign, and end with any number of digits
+    return /^-?\d*\.?\d*$/.test(val);
+  }, []);
 
   const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
     cellRefs.current[id] = el;
@@ -324,9 +330,9 @@ export function TableProvider({ children, initialRows, initialColumns, initialCe
   const contextValue = useMemo(() => ({
     rows, columns, cells, activeCell, globalSearch,
     setActiveCell, setGlobalSearch, registerRef, updateCell,
-    handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn, getIsStructureStable,
+    handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn, getIsStructureStable, isNumericalValue,
     table, sorting, columnFilters, columnSizing, headerHeight, setHeaderHeight
-  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, table, sorting, headerHeight, registerRef, updateCell, handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn, getIsStructureStable]);
+  }), [rows, columns, cells, activeCell, globalSearch, columnFilters, columnSizing, table, sorting, headerHeight, registerRef, updateCell, handleAddRow, handleDeleteRow, handleAddColumn, handleDeleteColumn, handleRenameColumn, getIsStructureStable, isNumericalValue]);
 
   return <TableContext.Provider value={contextValue}>{children}</TableContext.Provider>;
 }

@@ -24,7 +24,7 @@ export const TableCell = memo(function TableCell({
   cellId,
   registerRef
 }: TableCellProps) {
-  const { activeCell, getIsStructureStable } = useTableController();
+  const { activeCell, getIsStructureStable, isNumericalValue } = useTableController();
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value ?? "");
 
@@ -171,7 +171,7 @@ export const TableCell = memo(function TableCell({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (columnType === "number") {
-      if (/^-?\d*\.?\d*$/.test(val)) setLocalValue(val);
+      if (isNumericalValue(val)) setLocalValue(val);
     } else setLocalValue(val);
   };
 

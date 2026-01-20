@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import { flexRender } from "@tanstack/react-table";
+import { flexRender, type Header } from "@tanstack/react-table";
 import { TEST_TABLE_ID, useTableController } from "@/components/table/controller/TableProvider";
-import { type ColumnType, COLUMN_CONFIG } from "./controller/tableTypes";
+import { type ColumnType, type TableRow, COLUMN_CONFIG } from "./controller/tableTypes";
 
 export function TableHeader() {
-  const { table, columns, handleAddColumn, handleDeleteColumn, handleRenameColumn, headerHeight, setHeaderHeight } = useTableController();
+  const { table, columns, handleAddColumn, handleDeleteColumn, handleRenameColumn, headerHeight, setHeaderHeight, isNumericalValue } = useTableController();
   const headerGroups = table.getHeaderGroups();
 
   const startVerticalResize = useCallback((e: React.MouseEvent) => {
@@ -37,6 +37,22 @@ export function TableHeader() {
     handleAddColumn(columns.length + 1, TEST_TABLE_ID, name, type);
   }, [columns.length, handleAddColumn]);
 
+  const onFilterColumnClick = useCallback((header: Header<TableRow, unknown>, columnType: string) => {
+    let filterVal = prompt("Set a filter value for this column (Leave blank to clear the filter): ");
+    // null here means cancel prompt
+    if(filterVal === null) return;
+    // empty string case, use null to clear both text and number input
+    else if (filterVal === "") filterVal = null;
+    // Check filter if column type is number
+    if (columnType === "number" && filterVal) {
+      if(!isNumericalValue(filterVal)){
+        alert("Text is not a valid filter value for a number type column");
+        return;
+      }
+    }
+    header.column.setFilterValue(filterVal);
+  }, [isNumericalValue]);
+
   const hasColumns = headerGroups.some(group => group.headers.length > 0);
 
   return (
@@ -61,10 +77,6 @@ export function TableHeader() {
                   className={`px-3 py-2 font-medium select-none border-r last:border-r-0 transition-colors ${
                     isSorted ? "bg-blue-50/50" : ""
                   }`}
-                  onDoubleClick={() => {
-                    const newLabel = prompt("Enter new column name:");
-                    if (newLabel) handleRenameColumn(columnId, newLabel, TEST_TABLE_ID);
-                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     if (window.confirm(`Delete column?`)) handleDeleteColumn(columnId, TEST_TABLE_ID);
@@ -75,34 +87,46 @@ export function TableHeader() {
                       
                       {/* 1. Icon & Label Wrapper */}
                       <div 
-                        className={`flex items-center gap-1.5 overflow-hidden cursor-pointer hover:text-gray-900 transition-colors flex-grow flex-row }`}
-                        onClick={header.column.getToggleSortingHandler()}
+                        className={`flex items-center gap-1.5 overflow-hidden cursor-pointer hover:text-gray-900 transition-colors flex-grow flex-row w-[80%]}`}
                       >
                         <span className="text-gray-400 font-mono text-[10px] w-4 flex-shrink-0 text-center">
                           {config.icon}
                         </span>
-                        <span className="truncate">
+                        <span className="truncate"
+                          onClick={(e) => {e.stopPropagation();}}
+                          onDoubleClick={() => {
+                            const newLabel = prompt("Enter new column name:");
+                            if (newLabel && newLabel.trim() !== "") handleRenameColumn(columnId, newLabel.trim(), TEST_TABLE_ID);
+                          }}
+                        >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                         </span>
-                        {isSorted && (
-                          <span className="text-blue-500 font-bold flex-shrink-0">
-                            {isSorted === "asc" ? "↑" : "↓"}
-                          </span>
-                        )}
                       </div>
 
                       {/* 2. Filter Button (Always on the "inside" of the cell) */}
-                      <button
-                        className={`text-[10px] flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                          isFiltered ? "opacity-100 text-blue-600" : "text-gray-300"
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          header.column.setFilterValue(isFiltered ? undefined : "1");
-                        }}
-                      >
-                        {isFiltered ? "●" : "▾"}
-                      </button>
+                      <div className="flex flex-row items-center text-[16px] flex-shrink-0 transition-opacity">
+                          <span
+                          className={`px-1 flex-shrink-0 transition-opacity ${
+                            isSorted
+                              ? "text-blue-500 font-bold opacity-100"
+                              : "text-gray-400 opacity-100"
+                          }`}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {isSorted === "asc" ? "↑" : (isSorted === "desc" ? "↓" : "↕")}
+                        </span>
+                        <button
+                          className={`px-1 ${
+                            isFiltered ? "opacity-100 text-blue-600" : "text-gray-500"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFilterColumnClick(header, type);
+                          }}
+                        >
+                          {isFiltered ? "●" : "○"}
+                        </button>
+                      </div>
                     </div>
                   )}
 

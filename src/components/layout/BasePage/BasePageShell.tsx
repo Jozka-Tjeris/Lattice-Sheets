@@ -51,7 +51,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   // Set active table to null if no tables are present
   useEffect(() => {
     if (!hasTables) setActiveTableId(null);
-  })
+  }, [hasTables]);
 
   // -----------------------
   // Rows / Columns
