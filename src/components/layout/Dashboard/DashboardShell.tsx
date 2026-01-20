@@ -3,7 +3,7 @@ import { Sidebar } from "./SideBar";
 import { BaseList } from "./BaseList";
 
 
-function MainContent(){
+function MainDashboardContent(){
     return (
     <main className="flex-1 p-8 overflow-auto bg-[#f9fafb]">
       <h1 className="text-[27px] font-semibold mb-4">Home</h1>
@@ -20,7 +20,7 @@ export function DashboardShell() {
     <TopBar />
     <div className="flex flex-row flex-1">
         <Sidebar />
-        <MainContent />
+        <MainDashboardContent />
     </div>
   </div>;
 }
