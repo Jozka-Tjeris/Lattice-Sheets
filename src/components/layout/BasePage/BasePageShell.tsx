@@ -23,6 +23,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   const hasTables = !!tablesQuery.data && tablesQuery.data.length > 0;
 
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [creatingTable, setCreatingTable] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -47,29 +48,35 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     }
   }, [baseId]);
 
+  // Set active table to null if no tables are present
+  useEffect(() => {
+    if (!hasTables) setActiveTableId(null);
+  })
+
   // -----------------------
   // Rows / Columns
   // -----------------------
   const rowsQuery = trpc.row.getRowsWithCells.useQuery(
     { tableId: activeTableId ?? "" },
-    { enabled: !!activeTableId }
+    { enabled: hasTables && !!activeTableId && !creatingTable }
   );
 
   const columnsQuery = trpc.column.getColumns.useQuery(
     { tableId: activeTableId ?? "" },
-    { enabled: !!activeTableId }
+    { enabled: hasTables && !!activeTableId && !creatingTable }
   );
 
   // -----------------------
   // Create table mutation
   // -----------------------
-  const [creatingTable, setCreatingTable] = useState(false);
 
   const createTableMutation = trpc.table.createTable.useMutation({
     onMutate: async () => {
       setCreatingTable(true);
 
       await utils.table.listTablesByBaseId.cancel({ baseId });
+      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
+      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
 
       const previousTables =
         utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
@@ -125,6 +132,8 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     onSettled: async () => {
       setCreatingTable(false);
       await utils.table.listTablesByBaseId.invalidate({ baseId });
+      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
+      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
     },
   });
 
@@ -132,6 +141,8 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     onMutate: async ({tableId}) => {
       // Cancel any outgoing fetches
       await utils.table.listTablesByBaseId.cancel({ baseId });
+      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
+      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
 
       // Snapshot previous tables
       const previousTables = utils.table.listTablesByBaseId.getData({ baseId });
@@ -156,6 +167,8 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     },
     onSettled: async () => {
       await utils.table.listTablesByBaseId.invalidate({ baseId });
+      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
+      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
     },
   });
 
