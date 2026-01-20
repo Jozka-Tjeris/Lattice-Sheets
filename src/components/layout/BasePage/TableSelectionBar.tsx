@@ -6,7 +6,7 @@ interface TableSelectionBarProps {
   onTableSelect: (tableId: string) => void;
   onCreateTable: () => void;
   onDeleteTable: (tableId: string) => void;
-  onRenameTable: (tableId: string, newLabel: string) => void;
+  onRenameTable: (tableId: string) => void;
   creatingTable: boolean;
 }
 
@@ -32,18 +32,13 @@ export function TableSelectionBar({
                 ${isActive ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white hover:bg-gray-100"}
               `}
               onClick={() => onTableSelect(table.id)}
-              onDoubleClick={() => {
-                const newLabel = prompt("Enter new table name:");
-                if(newLabel) onRenameTable(table.id, newLabel);
-              }}
+              onDoubleClick={() => onRenameTable(table.id)}
             >
               <span className="truncate max-w-[120px]">{table.name}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation(); // prevent selecting tab
-                  if (confirm(`Are you sure you want to delete "${table.name}"?`)) {
-                    onDeleteTable(table.id);
-                  }
+                  onDeleteTable(table.id);
                 }}
                 className="ml-2 text-black hover:text-red-500 text-xs"
                 title="Delete table"

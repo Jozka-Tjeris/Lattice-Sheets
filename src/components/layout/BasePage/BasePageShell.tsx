@@ -71,7 +71,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   // -----------------------
 
   const createTableMutation = trpc.table.createTable.useMutation({
-    onMutate: async () => {
+    onMutate: async ({ name }) => {
       setCreatingTable(true);
 
       await utils.table.listTablesByBaseId.cancel({ baseId });
@@ -86,7 +86,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       const optimisticTable = {
         id: optimisticId,
         baseId,
-        name: "New Table",
+        name,
         createdAt: new Date(),
         updatedAt: new Date(),
         optimistic: true,
@@ -137,51 +137,105 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     },
   });
 
-  const deleteTableMutation = trpc.table.deleteTable.useMutation({
-    onMutate: async ({tableId}) => {
-      // Cancel any outgoing fetches
+  const renameTableMutation = trpc.table.renameTable.useMutation({
+    // Optimistic update
+    onMutate: async ({ tableId, name }) => {
+      // Cancel any in-flight fetches for tables
       await utils.table.listTablesByBaseId.cancel({ baseId });
-      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
-      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
 
-      // Snapshot previous tables
-      const previousTables = utils.table.listTablesByBaseId.getData({ baseId });
+      // Snapshot previous tables for rollback
+      const previousTables =
+        utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
 
-      // Optimistically remove table from the list
+      // Optimistically update table name
+      utils.table.listTablesByBaseId.setData({ baseId }, (old) =>
+        old?.map((t) =>
+          t.id === tableId
+            ? { ...t, name } // immutable update
+            : t
+        )
+      );
+
+      return { previousTables };
+    },
+    // Rollback on error
+    onError: (_err, _vars, context) => {
+      if (context?.previousTables) {
+        utils.table.listTablesByBaseId.setData({ baseId }, context.previousTables);
+      }
+    },
+    // Refresh authoritative data
+    onSettled: async () => {
+      // Only need to refresh the table list
+      await utils.table.listTablesByBaseId.invalidate({ baseId });
+    },
+  });
+
+  const deleteTableMutation = trpc.table.deleteTable.useMutation({
+    // Optimistic update
+    onMutate: async ({ tableId }) => {
+      // Cancel any in-flight fetches
+      await utils.table.listTablesByBaseId.cancel({ baseId });
+
+      // Snapshot previous tables for rollback
+      const previousTables =
+        utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
+
+      // Optimistically remove the table from the list
       utils.table.listTablesByBaseId.setData({ baseId }, (old) =>
         old?.filter((t) => t.id !== tableId) ?? []
       );
 
-      // Update active table if necessary
+      // If the deleted table was active, update active table to first remaining or null
       if (activeTableId === tableId) {
-        // Pick first remaining table or null
         setActiveTableId(previousTables?.[0]?.id ?? null);
       }
 
       return { previousTables };
     },
-    onError: (_err, _tableId, context) => {
+    // Rollback on error
+    onError: (_err, _vars, context) => {
       if (context?.previousTables) {
         utils.table.listTablesByBaseId.setData({ baseId }, context.previousTables);
       }
     },
+    // Refresh authoritative data after mutation
     onSettled: async () => {
       await utils.table.listTablesByBaseId.invalidate({ baseId });
-      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
-      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
     },
   });
 
   const handleCreateTable = () => {
+    const newTableName = prompt("Enter the new table name:", "New Table");
+    if(newTableName === null) return;
+    if(newTableName.trim() === ""){
+      alert("New table name cannot be blank");
+      return;
+    }
     createTableMutation.mutate({
       baseId,
-      name: "New Table",
+      name: newTableName.trim(),
     });
   };
 
-  const handleRenameTable = () => {
-    throw Error("ADD FUNCTIONALITY");
+  const handleRenameTable = (tableId: string) => {
+    const newTableName = prompt("Enter the new table name:");
+    if(newTableName === null) return;
+    if(newTableName.trim() === ""){
+      alert("New table name cannot be blank");
+      return;
+    }
+    renameTableMutation.mutate({
+      tableId,
+      name: newTableName.trim(),
+    });
   };
+
+  const handleDeleteTable = (tableId: string) => {
+    if (confirm("Are you sure you want to delete this table?")) {
+      deleteTableMutation.mutate({ tableId });
+    }
+  }
 
   // -----------------------
   // Initial table state
@@ -231,11 +285,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             onCreateTable={handleCreateTable}
             onRenameTable={handleRenameTable}
             creatingTable={creatingTable}
-            onDeleteTable={(tableId) => {
-              if (confirm("Are you sure you want to delete this table?")) {
-                deleteTableMutation.mutate({tableId});
-              }
-            }}
+            onDeleteTable={handleDeleteTable}
           />
 
           <GridViewBar />
@@ -262,8 +312,3 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     </TableProvider>
   );
 }
-
-
-/*
-delete table with confirmation
-*/
