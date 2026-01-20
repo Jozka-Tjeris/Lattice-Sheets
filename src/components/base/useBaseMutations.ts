@@ -4,14 +4,6 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { api as trpc } from "~/trpc/react";
 
-type Base = {
-  id: string;
-  name: string;
-  ownerId: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
 export function useBaseMutations(){
   const utils = trpc.useUtils();
   const router = useRouter();
@@ -24,7 +16,7 @@ export function useBaseMutations(){
       await utils.base.listBases.invalidate(); // Refresh the base list
       router.push(`/base/${newBase.id}`); // Redirect to the new base
     },
-    onError: (err, _vars, context) => {
+    onError: (err, _vars) => {
       console.error("Failed to create base:", err);
       alert("Failed to create base");
     },
