@@ -3,7 +3,9 @@ import { PrismaClient } from "../src/generated/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { faker } from "@faker-js/faker";
-import { SEED_OWNER_ID } from "./seed.config";
+// import { SEED_OWNER_ID } from "./seed.config";
+
+const SEED_OWNER_ID = "";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
