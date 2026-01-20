@@ -5,7 +5,7 @@ import { StickyColumnsBar } from "./StickyColumnsBar";
 import { useTableController } from "~/components/table/controller/TableProvider";
 import { useCallback, useEffect, useRef } from "react";
 
-export function MainContent() {
+export function MainTableContent() {
   const { setActiveCell, activeCell } = useTableController();
   const containerRef = useRef<HTMLDivElement>(null);
 

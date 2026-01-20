@@ -1,6 +1,6 @@
 "use client";
 
-import { MainContent } from "./MainContent";
+import { MainTableContent } from "./MainTableContent";
 
 interface ContentRetrieverProps {
   hasTables: boolean;
@@ -69,5 +69,5 @@ export function ContentRetriever({
     );
   }
 
-  return <MainContent />;
+  return <MainTableContent />;
 }
