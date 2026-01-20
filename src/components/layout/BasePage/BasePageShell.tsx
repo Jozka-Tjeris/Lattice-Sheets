@@ -81,7 +81,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       const previousTables =
         utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
 
-      const optimisticId = `optimistic-${crypto.randomUUID()}`;
+      const optimisticId = `optimistic-table-${crypto.randomUUID()}`;
 
       const optimisticTable = {
         id: optimisticId,
@@ -276,7 +276,9 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
         <LeftBar />
 
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <TopBar />
+          <TopBar 
+            baseId={baseId}
+          />
 
           <TableSelectionBar
             tables={tablesQuery.data ?? []}

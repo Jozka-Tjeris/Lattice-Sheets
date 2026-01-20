@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react";
-import { handleCreateBase } from "~/components/base/useBaseMutations";
+import { useBaseMutations } from "~/components/base/useBaseMutations";
 
 export function Sidebar() {
     const [creating, setCreating] = useState(false);
+    const { handleCreateBase } = useBaseMutations();
 
     return <aside className="flex flex-col w-75 border-r p-4 gap-2 h-full">
         <div className="min-h-145">
