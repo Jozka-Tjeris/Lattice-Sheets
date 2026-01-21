@@ -21,6 +21,7 @@ import {
   type VisibilityState,
   type ColumnSizingState,
   type Table,
+  type CellContext,
 } from "@tanstack/react-table";
 import type {
   Column,
@@ -76,14 +77,6 @@ type TableProviderProps = {
   initialGlobalSearch?: string;
 };
 
-function createTableRow(row: Row): TableRow {
-  return {
-    ...row,
-    internalId: row.internalId ?? row.id,
-    cells: {},
-  };
-}
-
 export function TableProvider({
   children,
   tableId,
@@ -92,9 +85,8 @@ export function TableProvider({
   initialCells,
   initialGlobalSearch = "",
 }: TableProviderProps) {
-  // 1. Initialize with stable internal IDs
   const [rows, setRows] = useState<TableRow[]>(() =>
-    initialRows.map((r) => createTableRow({ ...r, internalId: r.id })),
+    initialRows.map((r) => ({ ...r, internalId: r.internalId ?? r.id })),
   );
   const [columns, setColumns] = useState<Column[]>(() =>
     initialColumns.map((c) => ({
@@ -104,6 +96,12 @@ export function TableProvider({
     })),
   );
   const [cells, setCells] = useState<CellMap>(initialCells);
+
+  // Sync refs to rows/columns so updateCell doesn't need them in dependency array
+  const rowsRef = useRef(rows);
+  const columnsRef = useRef(columns);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
+  useEffect(() => { columnsRef.current = columns; }, [columns]);
 
   const [activeCell, setActiveCell] = useState<{
     rowId: string;
@@ -120,7 +118,6 @@ export function TableProvider({
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isNumericalValue = useCallback((val: string) => {
-    // Start with optional - sign, then any number of digits, then an optional . sign, and end with any number of digits
     return /^-?\d*\.?\d*$/.test(val);
   }, []);
 
@@ -150,24 +147,15 @@ export function TableProvider({
     }>
   >([]);
 
-  // Data update effects (refresh data states once tRPC data comes in)
   useEffect(() => {
     if (initialRows.length > 0) {
-      setRows(
-        initialRows.map((r) => createTableRow({ ...r, internalId: r.id })),
-      );
+      setRows(initialRows.map((r) => ({ ...r, internalId: r.internalId ?? r.id })));
     }
   }, [initialRows]);
 
   useEffect(() => {
     if (initialColumns.length > 0) {
-      setColumns(
-        initialColumns.map((c) => ({
-          ...c,
-          internalId: c.id,
-          columnType: c.columnType,
-        })),
-      );
+      setColumns(initialColumns.map((c) => ({ ...c, internalId: c.id, columnType: c.columnType })));
     }
   }, [initialColumns]);
 
@@ -177,51 +165,32 @@ export function TableProvider({
     }
   }, [initialCells]);
 
-  // -----------------------
-  // tRPC mutations
-  // -----------------------
   const updateCellsMutation = trpc.cell.updateCells.useMutation();
 
   const addRowMutation = trpc.row.addRow.useMutation({
-    onMutate: () => {
-      beginStructureMutation();
-    },
+    onMutate: () => beginStructureMutation(),
     onSuccess: ({ row, optimisticId }) => {
       setRows((prev) =>
         prev.map((r) =>
-          createTableRow(
-            r.id === optimisticId
-              ? { ...row, internalId: optimisticId, optimistic: false }
-              : r,
-          ),
+          r.internalId === optimisticId || r.id === optimisticId
+            ? { ...r, id: row.id, optimistic: false } // Keep existing object ref where possible
+            : r,
         ),
       );
-      // NO LONGER NEEDED: Rewriting all cell keys is unnecessary because we kept internalId stable!
     },
     onError: (_, { optimisticId }) => {
       setRows((prev) => prev.filter((r) => r.id !== optimisticId));
     },
-    onSettled: () => {
-      endStructureMutation();
-    },
+    onSettled: () => endStructureMutation(),
   });
 
   const addColumnMutation = trpc.column.addColumn.useMutation({
-    onMutate: () => {
-      beginStructureMutation();
-    },
+    onMutate: () => beginStructureMutation(),
     onSuccess: ({ column, optimisticId }) => {
       setColumns((prev) =>
         prev.map((c) =>
-          c.id === optimisticId
-            ? {
-                id: column.id,
-                internalId: optimisticId,
-                label: column.name,
-                columnType: column.columnType as ColumnType,
-                order: column.order,
-                optimistic: false,
-              }
+          c.id === optimisticId || c.internalId === optimisticId
+            ? { ...c, id: column.id, optimistic: false, label: column.name, order: column.order }
             : c,
         ),
       );
@@ -229,40 +198,31 @@ export function TableProvider({
     onError: (_, { optimisticId }) => {
       setColumns((prev) => prev.filter((c) => c.id !== optimisticId));
     },
-    onSettled: () => {
-      endStructureMutation();
-    },
+    onSettled: () => endStructureMutation(),
   });
 
   const deleteRowMutation = trpc.row.deleteRow.useMutation();
   const deleteColumnMutation = trpc.column.deleteColumn.useMutation();
   const renameColumnMutation = trpc.column.renameColumn.useMutation();
 
-  // -----------------------
-  // Cell updates
-  // -----------------------
   const updateCell = useCallback(
     (stableRowId: string, stableColumnId: string, value: CellValue) => {
       const key = `${stableRowId}:${stableColumnId}`;
       setCells((prev) => ({ ...prev, [key]: value }));
-      const actualRow = rows.find(
-        (r) => r.internalId === stableRowId || r.id === stableRowId,
-      );
-      const actualCol = columns.find(
-        (c) => c.internalId === stableColumnId || c.id === stableColumnId,
-      );
+      
+      const actualRow = rowsRef.current.find((r) => r.internalId === stableRowId || r.id === stableRowId);
+      const actualCol = columnsRef.current.find((c) => c.internalId === stableColumnId || c.id === stableColumnId);
+      
       if (!actualCol) return;
 
-      const payload = {
+      pendingCellUpdatesRef.current.push({
         rowId: actualRow?.id ?? stableRowId,
         columnId: actualCol?.id ?? stableColumnId,
         value: String(value),
         tableId: tableId,
-      };
-
-      pendingCellUpdatesRef.current.push(payload);
+      });
     },
-    [rows, columns, tableId],
+    [tableId],
   );
 
   useEffect(() => {
@@ -279,11 +239,9 @@ export function TableProvider({
     return () => clearInterval(interval);
   }, [updateCellsMutation]);
 
-  // -----------------------
-  // Structural Operations
-  // -----------------------
   const handleAddRow = useCallback(
     (orderNum: number) => {
+      if (columnsRef.current.length === 0) return;
       const optimisticId = `optimistic-row-${crypto.randomUUID()}`;
       setRows((prev) => [
         ...prev,
@@ -291,8 +249,7 @@ export function TableProvider({
           id: optimisticId,
           internalId: optimisticId,
           order: orderNum,
-          optimistic: true,
-          cells: {},
+          optimistic: true
         },
       ]);
       addRowMutation.mutate({ tableId, orderNum, optimisticId });
@@ -367,73 +324,64 @@ export function TableProvider({
     [renameColumnMutation, tableId],
   );
 
-  // -----------------------
-  // Table Setup
-  // -----------------------
-  const visibleRows = useMemo(
-    () => [...rows].sort((a, b) => a.order - b.order),
-    [rows],
-  );
-
-  const tableData = useMemo<TableRow[]>(() => {
+  // STABLE DATA: We return original row references
+  const tableData = useMemo(() => {
+    const sorted = [...rows].sort((a, b) => a.order - b.order);
     const search = globalSearch.trim().toLowerCase();
-    return visibleRows
-      .filter((row) => {
-        if (!search) return true;
-        const rId = row.internalId ?? row.id;
-        return columns.some((col) => {
-          const cId = col.internalId ?? col.id;
-          const value = cells[`${rId}:${cId}`];
-          return value != null && String(value).toLowerCase().includes(search);
-        });
-      })
-      .map((row, idx) => {
-        const rId = row.internalId ?? row.id;
-        const record: TableRow = {
-          ...row,
-          internalId: rId,
-          order: idx,
-          cells: {},
-        };
-        columns.forEach((col) => {
-          const cId = col.internalId ?? col.id;
-          record.cells[cId] = cells[`${rId}:${cId}`] ?? "";
-        });
-        return record;
-      });
-  }, [visibleRows, columns, cells, globalSearch]);
+    if (!search) return sorted;
 
-  const tableColumns = useMemo<ColumnDef<TableRow>[]>(() => {
+    return sorted.filter((row) => {
+      const rId = row.internalId ?? row.id;
+      return columns.some((col) => {
+        const cId = col.internalId ?? col.id;
+        const value = cells[`${rId}:${cId}`];
+        return value != null && String(value).toLowerCase().includes(search);
+      });
+    });
+  }, [rows, columns, cells, globalSearch]);
+
+  // Define this inside TableProvider but BEFORE tableColumns
+  const CellRenderer = useCallback((info: CellContext<TableRow, CellValue>) => {
+    const colId = info.column.id;
+    const rowElem = info.row.original;
+    const rId = rowElem.internalId ?? rowElem.id;
+    const cellKey = `${rId}:${colId}`;
+    const resolvedType = info.column.columnDef.meta?.columnType ?? "text";
+    
+    // Get the most recent value directly from the table state
+    // This ensures the value is never stale even if the column def doesn't re-run
+    const val = info.getValue();
+
+    return (
+      <TableCell
+        cellId={cellKey}
+        value={val} // info.getValue() is updated by TanStack automatically
+        rowId={rId}
+        columnId={colId}
+        columnType={resolvedType}
+        onClick={() => setActiveCell({ rowId: rId, columnId: colId })}
+        onChange={(value) => updateCell(rId, colId, value)}
+        registerRef={registerRef}
+      />
+    );
+  }, [updateCell, registerRef, setActiveCell]); // Note: cells is NOT a dependency here
+
+  const tableColumns = useMemo<ColumnDef<TableRow, CellValue>[]>(() => {
     return columns.map((col) => {
       const colId = col.internalId ?? col.id;
-      const resolvedType = col.columnType ?? "text";
       return {
         id: colId,
-        accessorFn: (row) => row.cells[colId],
+        accessorFn: (row) => cells[`${row.internalId ?? row.id}:${colId}`] ?? "",
         header: col.label,
         size: col.width ?? 150,
-        meta: { columnType: resolvedType },
-        cell: (info) => {
-          const rowElem = info.row.original;
-          const rId = rowElem.internalId ?? rowElem.id;
-          const cellKey = `${rId}:${colId}`;
-
-          return (
-            <TableCell
-              cellId={cellKey}
-              value={cells[cellKey] ?? ""}
-              rowId={rId}
-              columnId={colId}
-              columnType={resolvedType}
-              onClick={() => setActiveCell({ rowId: rId, columnId: colId })}
-              onChange={(value) => updateCell(rId, colId, value)}
-              registerRef={registerRef}
-            />
-          );
-        },
+        meta: { columnType: col.columnType ?? "text", dbId: col.id },
+        // Use the stable renderer function
+        cell: CellRenderer,
       };
     });
-  }, [columns, cells, updateCell, registerRef]);
+    // We include cells here so the accessorFn updates, 
+    // but because CellRenderer is stable, the TableCell won't unmount.
+  }, [columns, cells, CellRenderer]);
 
   const table = useReactTable({
     data: tableData,
@@ -446,7 +394,7 @@ export function TableProvider({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getRowId: (row) => row.internalId ?? row.id, // CRITICAL: Stability anchor
+    getRowId: (row) => row.internalId ?? row.id,
     columnResizeMode: "onChange",
   });
 

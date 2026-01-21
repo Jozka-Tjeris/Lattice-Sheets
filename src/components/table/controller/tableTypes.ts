@@ -1,3 +1,5 @@
+import { type RowData } from "@tanstack/react-table";
+
 export type CellValue = string | number;
 
 export type CellKey = string;
@@ -27,6 +29,14 @@ export const COLUMN_CONFIG = {
   },
 } as const;
 
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    columnType: ColumnType;
+    dbId?: string;
+  }
+}
+
 export type Row = {
   id: string;
   order: number;
@@ -34,9 +44,7 @@ export type Row = {
   internalId?: string;
 };
 
-export type TableRow = Row & {
-  cells: Record<string, CellValue>;
-};
+export type TableRow = Row;
 
 export type CellMap = Record<CellKey, CellValue>;
 

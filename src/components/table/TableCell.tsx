@@ -24,7 +24,7 @@ export const TableCell = memo(function TableCell({
   cellId,
   registerRef,
 }: TableCellProps) {
-  const { activeCell, getIsStructureStable, isNumericalValue } =
+  const { activeCell, isNumericalValue } =
     useTableController();
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value ?? "");
@@ -123,10 +123,6 @@ export const TableCell = memo(function TableCell({
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLDivElement | HTMLInputElement>,
   ) => {
-    if (!getIsStructureStable()) {
-      e.preventDefault();
-      return;
-    }
     if (isEditing) {
       switch (e.key) {
         case "Enter":
@@ -238,7 +234,7 @@ export const TableCell = memo(function TableCell({
       <input
         ref={inputRef}
         value={localValue}
-        disabled={!isEditing || !getIsStructureStable()}
+        disabled={!isEditing}
         onChange={handleInputChange}
         className={`absolute inset-0 h-full w-full bg-transparent px-2 outline-none ${!isEditing ? "pointer-events-none opacity-0" : ""} `}
       />
