@@ -178,18 +178,25 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       const previousTables =
         utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
 
+      // Filter out table to be deleted
+      const filteredTables = 
+        previousTables.filter((t) => t.id !== tableId);
+
       // Optimistically remove the table from the list
       utils.table.listTablesByBaseId.setData(
         { baseId },
-        (old) => old?.filter((t) => t.id !== tableId) ?? [],
+        filteredTables,
       );
 
       // If the deleted table was active, update active table to first remaining or null
       if (activeTableId === tableId) {
-        setActiveTableId(previousTables?.[0]?.id ?? null);
+        setActiveTableId(filteredTables?.[0]?.id ?? null);
       }
 
-      return { previousTables };
+      const nextActiveTableId =
+        activeTableId === tableId ? filteredTables[0]?.id ?? null : activeTableId;
+
+      return { previousTables, nextActiveTableId };
     },
     // Rollback on error
     onError: (_err, _vars, context) => {
@@ -199,10 +206,15 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
           context.previousTables,
         );
       }
+      setActiveTableId(context?.nextActiveTableId ?? null);
     },
     // Refresh authoritative data after mutation
     onSettled: async () => {
-      await utils.table.listTablesByBaseId.invalidate({ baseId });
+      await Promise.all([
+        utils.table.listTablesByBaseId.invalidate({ baseId }),
+        utils.row.getRowsWithCells.invalidate(),
+        utils.column.getColumns.invalidate(),
+      ]);
     },
   });
 
