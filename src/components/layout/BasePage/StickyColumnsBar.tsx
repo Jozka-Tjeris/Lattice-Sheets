@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { useTableController, ROW_HEIGHT } from "@/components/table/controller/TableProvider";
+import { useTableController } from "@/components/table/controller/TableProvider";
 
 interface StickyProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -10,7 +10,7 @@ interface StickyProps {
 export const StickyColumnsBar = memo(function StickyColumnsBar({
   scrollRef,
 }: StickyProps) {
-  const { table, headerHeight, columns, rows, startVerticalResize, handleAddRow, columnsRef } = useTableController();
+  const { table, headerHeight, columns, rows, startVerticalResize, handleAddRow, ROW_HEIGHT } = useTableController();
   const hasColumns = columns.length > 0;
 
   // Rows exactly as rendered in the main table
@@ -77,7 +77,7 @@ export const StickyColumnsBar = memo(function StickyColumnsBar({
               }}
             >
               <button
-                onClick={() => {handleAddRow(rows.length + 1, columnsRef)}}
+                onClick={() => {handleAddRow(rows.length + 1)}}
                 disabled={!hasColumns}
                 className={`inline-flex h-6 w-6 items-center justify-center rounded text-lg leading-none text-white shadow-sm transition 
                   ${hasColumns ? 
