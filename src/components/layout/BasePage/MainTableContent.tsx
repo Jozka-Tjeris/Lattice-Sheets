@@ -6,11 +6,18 @@ import { useTableController } from "~/components/table/controller/TableProvider"
 import { useCallback, useEffect, useRef } from "react";
 
 export function MainTableContent() {
-  const { setActiveCell, activeCell } = useTableController();
+  const { setActiveCell, activeCell, columns } = useTableController();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const stickyScrollRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset active cell if no columns present
+  useEffect(() => {
+    if(columns.length === 0 && activeCell){
+      setActiveCell(null);
+    }
+  }, [columns.length, activeCell, setActiveCell]);
 
   // Synchronize the vertical scroll
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
