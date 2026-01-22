@@ -33,6 +33,7 @@ import type {
 } from "./tableTypes";
 import { TableCell } from "../TableCell";
 import { api as trpc } from "~/trpc/react";
+import { useTableLayout } from "./useTableLayout";
 
 export const ROW_HEIGHT = 40;
 export const BORDER_WIDTH = 1;
@@ -115,8 +116,6 @@ export function TableProvider({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
-  const [headerHeight, setHeaderHeight] = useState(ROW_HEIGHT);
 
   const structureMutationInFlightRef = useRef(0);
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -169,27 +168,7 @@ export function TableProvider({
     }
   }, [initialCells]);
 
-  const startVerticalResize = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = headerHeight;
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const delta = moveEvent.clientY - startY;
-        setHeaderHeight(Math.max(ROW_HEIGHT, startHeight + delta));
-      };
-
-      const onMouseUp = () => {
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
-      };
-
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-    },
-    [headerHeight, setHeaderHeight],
-  );
+  const { ROW_HEIGHT, headerHeight, setHeaderHeight, startVerticalResize, columnSizing, setColumnSizing } = useTableLayout()
 
   const updateCellsMutation = trpc.cell.updateCells.useMutation();
 
