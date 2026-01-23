@@ -54,15 +54,15 @@ export function useTableStateCache(tableId: string) {
         const raw = localStorage.getItem(storageKey);
         if (!raw) return null;
 
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(raw) as CachedTableState;
         if (!parsed || typeof parsed !== "object") return null;
 
         if (!validColumnIds) {
-          return parsed as CachedTableState;
+          return parsed;
         }
 
         return normalizeState(
-          parsed as CachedTableState,
+          parsed,
           new Set(validColumnIds)
         );
       } catch {

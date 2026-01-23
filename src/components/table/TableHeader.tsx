@@ -149,7 +149,7 @@ export function TableHeader() {
       {columns.length > 0 ? (
         headerGroups.map((group) => (
           <tr key={group.id} style={{ height: headerHeight }}>
-            {group.headers.map((header, idx) => {
+            {group.headers.map((header) => {
               const isSorted = header.column.getIsSorted();
               const isFiltered = header.column.getIsFiltered();
               const isPinned = header.column.getIsPinned();
@@ -183,7 +183,7 @@ export function TableHeader() {
                     zIndex: header.column.getIsPinned() ? 40 : 30,
                   }}
                   className={`border-r border-b px-3 py-2 font-medium transition-colors select-none last:border-r-0 border-gray-300 ${
-                    isSorted ? "bg-blue-50/50" : "bg-gray-100"
+                    isSorted ? "bg-blue-50" : "bg-gray-100"
                   }`}
                   onContextMenu={(e) => {
                     e.preventDefault();
