@@ -97,35 +97,6 @@ export function TableProvider({
   const [cached, setCached] = useState<CachedTableState | null>(null);
   const hasHydratedRef = useRef(false);
 
-  //Perform initial cache loading
-  useEffect(() => {
-    if (!columns.length) return;
-    if(!getIsStructureStable()) return;
-    if(cached) return;
-
-    setCached(load());
-
-    hasHydratedRef.current = true;
-  }, [columns, load]);
-
-  // After cache has loaded, perform normalization
-  useEffect(() => {
-    if (!cached || !columns.length) return;
-
-    const ids = new Set(columns.map(c => c.internalId ?? c.id));
-
-    setCached(prev =>
-      prev ? normalizeState(prev, ids) : null
-    );
-  }, [columns]);
-
-  //Set hydration ref to true after cache has been filled
-  useEffect(() => {
-    if (cached) {
-      hasHydratedRef.current = true;
-    }
-  }, [cached]);
-
   const [globalSearch, setGlobalSearch] = useState<string>(initialGlobalSearch);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -222,6 +193,37 @@ export function TableProvider({
     getIsStructureStable, structureMutationInFlightRef 
   } = useTableStructure(tableId, setRows, setColumns, columnsRef);
 
+  //Perform initial cache loading
+  useEffect(() => {
+    if (!columns.length) return;
+    if(!getIsStructureStable()) return;
+    if(cached) return;
+
+    setCached(load());
+
+    hasHydratedRef.current = true;
+  }, [columns, load, cached, getIsStructureStable]);
+
+  // After cache has loaded, perform normalization
+  useEffect(() => {
+    if (!cached || !columns.length) return;
+    const ids = new Set(columns.map(c => c.internalId ?? c.id));
+    setCached(prev => {
+      const next = prev ? normalizeState(prev, ids) : null;
+      if (JSON.stringify(next) !== JSON.stringify(prev)) {
+        return next;
+      }
+      return prev; // <- prevents loop
+    });
+  }, [columns, cached]);
+
+  //Set hydration ref to true after cache has been filled
+  useEffect(() => {
+    if (cached) {
+      hasHydratedRef.current = true;
+    }
+  }, [cached]);
+
   const saveTimeoutRef = useRef<number | null>(null);
 
   // Debounced saving of cache
@@ -256,6 +258,7 @@ export function TableProvider({
     columnSizing,
     columnPinning,
     getIsStructureStable,
+    save,
   ]);
 
   //Flush cell updates after preset interval duration
