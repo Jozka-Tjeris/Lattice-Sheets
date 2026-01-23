@@ -141,14 +141,16 @@ model Cell {
 }
 
 model View {
-  id        String   @id @default(cuid())
-  tableId   String
-  name      String
-  config    Json // Store sorting, filtering, hidden columns
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  tableId     String
+  name        String
+  config      Json       // Full CachedTableState (sorting, filters, visibility, sizing, pinning)
+  isDefault   Boolean    @default(false) // Optional: mark a default view per table
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   table Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   @@index([tableId])
+  @@unique([tableId, name]) // Optional: unique names per table
 }
