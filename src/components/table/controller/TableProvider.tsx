@@ -15,7 +15,7 @@ import { TableCell } from "../TableCell";
 import { useTableLayout } from "./useTableLayout";
 import { useTableInteractions } from "./useTableInteractions";
 import { useTableStructure } from "./useTableStructure";
-import { useTableStateCache } from "./useTableStateCache";
+import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 
 export type TableProviderState = {
   rows: TableRow[];
@@ -94,21 +94,55 @@ export function TableProvider({
   useEffect(() => { columnsRef.current = columns; }, [columns]);
 
   const { load, save } = useTableStateCache(tableId);
-  const cachedRef = useRef<ReturnType<typeof load> | null>(null);
+  const [cached, setCached] = useState<CachedTableState | null>(null);
+  const hasHydratedRef = useRef(false);
 
-  if (cachedRef.current === null) {
-    cachedRef.current = load(initialColumns.map(c => c.internalId ?? c.id));
-  }
+  //Perform initial cache loading
+  useEffect(() => {
+    if (!columns.length) return;
+    if(!getIsStructureStable()) return;
+    if(cached) return;
 
-  const cached = cachedRef.current;
+    setCached(load());
+
+    hasHydratedRef.current = true;
+  }, [columns, load]);
+
+  // After cache has loaded, perform normalization
+  useEffect(() => {
+    if (!cached || !columns.length) return;
+
+    const ids = new Set(columns.map(c => c.internalId ?? c.id));
+
+    setCached(prev =>
+      prev ? normalizeState(prev, ids) : null
+    );
+  }, [columns]);
+
+  //Set hydration ref to true after cache has been filled
+  useEffect(() => {
+    if (cached) {
+      hasHydratedRef.current = true;
+    }
+  }, [cached]);
 
   const [globalSearch, setGlobalSearch] = useState<string>(initialGlobalSearch);
-  const [sorting, setSorting] = useState<SortingState>(cached?.sorting ?? []);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(cached?.columnFilters ?? []);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(cached?.columnVisibility ?? {});
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(
-    cached?.columnPinning ?? {left: [], right: []}
-  );
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    left: [],
+    right: [],
+  });
+
+  useEffect(() => {
+    if (!cached) return;
+
+    setSorting(cached.sorting);
+    setColumnFilters(cached.columnFilters);
+    setColumnVisibility(cached.columnVisibility);
+    setColumnPinning(cached.columnPinning);
+  }, [cached]);
 
   const pinColumn = useCallback((columnId: string) => {
     setColumnPinning({
@@ -189,14 +223,11 @@ export function TableProvider({
   } = useTableStructure(tableId, setRows, setColumns, columnsRef);
 
   const saveTimeoutRef = useRef<number | null>(null);
-  const hasMountedRef = useRef(false);
 
+  // Debounced saving of cache
   useEffect(() => {
-    if(!hasMountedRef.current){
-      hasMountedRef.current = true;
-      return;
-    }
-
+    // Only save cache if already hydrated and no structure mutations are happening
+    if(!hasHydratedRef.current) return;
     if(!getIsStructureStable()) return;
 
     if(saveTimeoutRef.current !== null){
@@ -223,25 +254,9 @@ export function TableProvider({
     columnFilters,
     columnVisibility,
     columnSizing,
+    columnPinning,
     getIsStructureStable,
   ]);
-
-  useEffect(() => {
-    return () => {
-      // Flush any pending debounce
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      save({
-        sorting,
-        columnFilters,
-        columnVisibility,
-        columnSizing,
-        columnPinning,
-      });
-    };
-  }, []);
 
   //Flush cell updates after preset interval duration
   useEffect(() => {

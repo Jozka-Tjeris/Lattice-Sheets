@@ -19,7 +19,7 @@ export type CachedTableState = {
 
 const VERSION = 1;
 
-function normalizeState(
+export function normalizeState(
   cached: CachedTableState,
   validColumnIds: Set<string>
 ): CachedTableState {
