@@ -7,7 +7,7 @@ import { useTableController } from "@/components/table/controller/TableProvider"
  * as they are now managed via the table instance or Context.
  */
 export function TableBody() {
-  const { table, rows, columns, handleDeleteRow, ROW_HEIGHT } =
+  const { table, rows, columns, handleDeleteRow, ROW_HEIGHT, activeCell } =
     useTableController();
 
   const hasRows = rows.length > 0;
@@ -69,6 +69,17 @@ export function TableBody() {
     );
   }
 
+  const leftOffsetMap: Record<string, number> = {};
+  let cumulativeLeft = 0;
+  columns.forEach(col => {
+    if (table.getColumn(col.internalId ?? col.id)?.getIsPinned()) {
+      leftOffsetMap[col.internalId ?? col.id] = cumulativeLeft;
+      cumulativeLeft += col.width ?? 180; // fallback to default width
+    }
+  });
+
+  const headerGroups = table.getHeaderGroups();
+
   // -----------------------------
   // Render TanStack Row Model
   // -----------------------------
@@ -77,7 +88,6 @@ export function TableBody() {
       {table.getRowModel().rows.map((row, idx) => (
         <tr
           key={row.id}
-          className={`border-b hover:bg-[#f0f0f0]`}
           onContextMenu={(e) => {
             const rowOriginal = row.original;
             e.preventDefault();
@@ -85,26 +95,45 @@ export function TableBody() {
             handleRowRightClick(e, rowOriginal.id, idx + 1);
           }}
         >
-          {row.getVisibleCells().map((cell) => (
-            <td
-              key={cell.id}
-              className="h-full border-r p-0 align-top"
-              // Tailwind cannot generate dynamic classes, must use inline styles
-              style={{ width: cell.column.getSize(), height: ROW_HEIGHT }}
-            >
-              {/* This is where the magic happens. flexRender calls the 
-                  cell renderer defined in your TableProvider.
-              */}
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </td>
-          ))}
+          {row.getVisibleCells().map((cell) => {
+            const isActive = activeCell?.rowId === row.id && activeCell?.columnId === cell.column.id;
+            // Active cell should be above regular cells but under pinned cells
+            // Active pinned cell should be above other cells but under headers
+            const zIdxVal = (isActive ? 5 : 0) + (cell.column.getIsPinned() ? 20 : 0);
+            return (
+              <td
+                key={cell.id}
+                className="h-full border-r border-b p-0 align-top"
+                // Tailwind cannot generate dynamic classes, must use inline styles
+                style={{ 
+                  width: cell.column.getSize(),
+                  height: ROW_HEIGHT,
+                  position: cell.column.getIsPinned() ? "sticky" : "relative",
+                  left: cell.column.getIsPinned() ? leftOffsetMap[cell.column.id] : undefined,
+                  zIndex: zIdxVal,
+                  background: cell.column.getIsPinned() ? "#fefefe" : undefined,
+                }}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            )
+          })}
+          {/* Filler cell for add column button */}
+          <td className="h-full border-b"/>
         </tr>
       ))}
       <tr>
         {/* Filler cells for padding */}
-        {columns.map((_, idx) => (
+        {headerGroups[0]?.headers.map((header, idx) => (
           <td key={idx} className="h-full border-r"
-            style={{ height: ROW_HEIGHT }}
+            style={{ 
+              width: header.column.getSize(), 
+              height: ROW_HEIGHT,
+              position: header.column.getIsPinned() ? "sticky" : "relative",
+              left: header.column.getIsPinned() ? leftOffsetMap[header.column.id] : undefined,
+              zIndex: header.column.getIsPinned() ? 20 : 0,
+              background: "#fefefe",
+            }}
           />
         ))}
       </tr>

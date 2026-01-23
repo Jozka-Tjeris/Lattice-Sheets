@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { flexRender, type Header } from "@tanstack/react-table";
+import { flexRender, type Header, type SortDirection } from "@tanstack/react-table";
 import { useTableController } from "@/components/table/controller/TableProvider";
 import {
   type ColumnType,
@@ -9,32 +9,18 @@ import {
   COLUMN_CONFIG,
 } from "./controller/tableTypes";
 
-export function TableHeader() {
-  const {
-    table,
-    columns,
-    handleAddColumn,
-    handleDeleteColumn,
-    handleRenameColumn,
-    headerHeight,
-    startVerticalResize,
-    isNumericalValue,
-  } = useTableController();
+interface TableHeaderContentProps{
+  isFiltered: boolean;
+  isSorted: false | SortDirection;
+  isPinned: false | 'left' | 'right';
+  actualId: string;
+  type: ColumnType;
+  header: Header<TableRow, unknown>;
+  configIcon: string;
+}
 
-  const headerGroups = table.getHeaderGroups();
-
-  const onAddColumnClick = useCallback(() => {
-    const name = prompt("Enter column name:", `Column ${columns.length + 1}`);
-    if (!name) return;
-    const typeInput = prompt(
-      "Enter column type (text, number) [default is text]:",
-      "text",
-    );
-    if (typeInput === null) return;
-    const type: ColumnType =
-      typeInput.toLowerCase().trim() === "number" ? "number" : "text";
-    handleAddColumn(columns.length + 1, name, type);
-  }, [columns.length, handleAddColumn]);
+function TableHeaderContent({ isFiltered, isSorted, isPinned, actualId, type, header, configIcon}: TableHeaderContentProps){
+  const { handleRenameColumn, isNumericalValue } = useTableController();
 
   const onFilterColumnClick = useCallback(
     (header: Header<TableRow, unknown>, columnType: string) => {
@@ -53,13 +39,120 @@ export function TableHeader() {
   );
 
   return (
+    <div className="flex h-full w-full flex-row items-center gap-2">
+      <div className="w-[80%] flex flex-grow cursor-pointer flex-row items-center gap-1.5 overflow-hidden transition-colors hover:text-gray-900">
+        <span className="w-4 flex-shrink-0 text-center font-mono text-[10px] text-gray-400">
+          {configIcon}
+        </span>
+        <span
+          className="truncate"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={() => {
+            const newLabel = prompt("Enter new column name:");
+            if (newLabel && newLabel.trim() !== "")
+              handleRenameColumn(actualId, newLabel.trim());
+          }}
+        >
+          {flexRender(
+            header.column.columnDef.header,
+            header.getContext(),
+          )}
+        </span>
+      </div>
+      <div className="flex flex-shrink-0 flex-row items-center text-[16px] transition-opacity">
+        <span
+          className={`flex-shrink-0 px-1 transition-opacity ${
+            isSorted
+              ? "font-bold text-blue-500 opacity-100"
+              : "text-gray-400 opacity-100"
+          }`}
+          onClick={header.column.getToggleSortingHandler()}
+        >
+          {isSorted === "asc"
+            ? "↑"
+            : isSorted === "desc"
+              ? "↓"
+              : "↕"}
+        </span>
+        <button
+          className={`px-1 ${
+            isFiltered
+              ? "text-blue-600 opacity-100"
+              : "text-gray-500"
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFilterColumnClick(header, type);
+          }}
+        >
+          {isFiltered ? "●" : "○"}
+        </button>
+        {/* Pin Icon */}
+        <button
+          className={`px-1 ${
+            isPinned ? "text-blue-500 opacity-100" : "text-gray-400"
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if(!isPinned) header.column.pin('left');
+            else header.column.pin(false);
+          }}
+        >
+          <span>
+            📌
+            {isPinned && (
+              <svg className="slash" viewBox="0 0 28 28" style={{
+                position: "absolute",
+                width: 28, height: 28,
+                top: 5.8, right: 10
+                }}>
+                <circle cx="14" cy="14" r="10" className="stroke-gray-600" strokeWidth="2" fill="none"/>
+                <line x1="8" y1="8" x2="21" y2="21" className="stroke-gray-600" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            )}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function TableHeader() {
+  const {
+    table,
+    columns,
+    handleAddColumn,
+    handleDeleteColumn,
+    headerHeight,
+    startVerticalResize,
+  } = useTableController();
+
+  const headerGroups = table.getHeaderGroups();
+
+  const onAddColumnClick = useCallback(() => {
+    const name = prompt("Enter column name:", `Column ${columns.length + 1}`);
+    if (!name) return;
+    const typeInput = prompt(
+      "Enter column type (text, number) [default is text]:",
+      "text",
+    );
+    if (typeInput === null) return;
+    const type: ColumnType =
+      typeInput.toLowerCase().trim() === "number" ? "number" : "text";
+    handleAddColumn(columns.length + 1, name, type);
+  }, [columns.length, handleAddColumn]);
+
+  let prevColSize = 0;
+
+  return (
     <thead className="bg-gray-50 text-[11px] tracking-wider text-gray-500 uppercase">
       {columns.length > 0 ? (
         headerGroups.map((group) => (
           <tr key={group.id} style={{ height: headerHeight }}>
-            {group.headers.map((header) => {
+            {group.headers.map((header, idx) => {
               const isSorted = header.column.getIsSorted();
               const isFiltered = header.column.getIsFiltered();
+              const isPinned = header.column.getIsPinned();
 
               const meta = header.column.columnDef.meta as {
                 columnType: ColumnType;
@@ -69,27 +162,28 @@ export function TableHeader() {
               const actualId = meta?.dbId;
               const config = COLUMN_CONFIG[type];
 
+              let leftOffset = 0; // cumulative offset for pinned columns
+              if (header.column.getIsPinned()) {
+                leftOffset += prevColSize;
+              }
+              prevColSize = header.getSize();
+
               return (
                 <th
                   key={header.id}
                   style={{
                     width: header.getSize(),
                     //Add min and max width to prevent shrinking and stretching respectively
-                    minWidth:header.column.columnDef.minSize,
+                    minWidth: header.column.columnDef.minSize,
                     maxWidth: header.column.columnDef.maxSize,
                     height: headerHeight,
                     position: "sticky",
                     top: 0,
-                    zIndex: 30,
-                    background: "#f9fafb",
-                    /* The first shadow is 1px solid gray at the very bottom.
-                      The second shadow is a solid "mask" that prevents anything 
-                      underneath from bleeding through the background. (Targets bottom and right areas)
-                    */
-                    boxShadow: "inset 0 -1px 0 0 #d1d5db, 0 -0.5px 0 0.5px #d1d5db"
+                    left: header.column.getIsPinned() ? leftOffset : undefined,
+                    zIndex: header.column.getIsPinned() ? 40 : 30,
                   }}
-                  className={`border-r px-3 py-2 font-medium transition-colors select-none last:border-r-0 ${
-                    isSorted ? "bg-blue-50/50" : ""
+                  className={`border-r border-b px-3 py-2 font-medium transition-colors select-none last:border-r-0 border-gray-300 ${
+                    isSorted ? "bg-blue-50/50" : "bg-gray-100"
                   }`}
                   onContextMenu={(e) => {
                     e.preventDefault();
@@ -98,56 +192,15 @@ export function TableHeader() {
                   }}
                 >
                   {!header.isPlaceholder && (
-                    <div className="flex h-full w-full flex-row items-center gap-2">
-                      <div className="w-[80%] flex flex-grow cursor-pointer flex-row items-center gap-1.5 overflow-hidden transition-colors hover:text-gray-900">
-                        <span className="w-4 flex-shrink-0 text-center font-mono text-[10px] text-gray-400">
-                          {config.icon}
-                        </span>
-                        <span
-                          className="truncate"
-                          onClick={(e) => e.stopPropagation()}
-                          onDoubleClick={() => {
-                            const newLabel = prompt("Enter new column name:");
-                            if (newLabel && newLabel.trim() !== "")
-                              handleRenameColumn(actualId, newLabel.trim());
-                          }}
-                        >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex flex-shrink-0 flex-row items-center text-[16px] transition-opacity">
-                        <span
-                          className={`flex-shrink-0 px-1 transition-opacity ${
-                            isSorted
-                              ? "font-bold text-blue-500 opacity-100"
-                              : "text-gray-400 opacity-100"
-                          }`}
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          {isSorted === "asc"
-                            ? "↑"
-                            : isSorted === "desc"
-                              ? "↓"
-                              : "↕"}
-                        </span>
-                        <button
-                          className={`px-1 ${
-                            isFiltered
-                              ? "text-blue-600 opacity-100"
-                              : "text-gray-500"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onFilterColumnClick(header, type);
-                          }}
-                        >
-                          {isFiltered ? "●" : "○"}
-                        </button>
-                      </div>
-                    </div>
+                    <TableHeaderContent 
+                      isFiltered={isFiltered}
+                      isSorted={isSorted}
+                      isPinned={isPinned}
+                      actualId={actualId}
+                      type={type}
+                      header={header}
+                      configIcon={config.icon}
+                    />
                   )}
                   <div
                     onMouseDown={header.getResizeHandler()}
@@ -163,14 +216,12 @@ export function TableHeader() {
 
             {/* Add Column Button */}
             <th
-              className="border-l bg-gray-50 p-0 text-center"
+              className="border-b bg-gray-100 border-gray-300 p-0 text-center"
               style={{ 
                 width: 50,
                 position: "sticky",
                 top: 0,
                 zIndex: 30,
-                background: "#f9fafb",
-                boxShadow: "inset 0 -1px 0 0 #d1d5db"
               }}
             >
               <button

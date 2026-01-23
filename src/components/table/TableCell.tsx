@@ -217,7 +217,7 @@ export const TableCell = memo(function TableCell({
       tabIndex={0}
       className={`relative flex h-full w-full cursor-text items-center truncate px-2 py-1 transition-colors outline-none hover:bg-gray-100 ${
         isActive
-          ? "z-10 rounded-[1px] border border-blue-500 shadow-[0_0_0_2px_rgba(60,120,255,1)]"
+          ? "rounded-[1px] outline-3 outline-solid outline-blue-500"
           : "border border-transparent"
       } `}
       onMouseDown={handleMouseDown}
