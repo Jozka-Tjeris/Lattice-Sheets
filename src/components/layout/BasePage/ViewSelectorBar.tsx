@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { api as trpc } from "~/trpc/react";
 import { useTableController } from "~/components/table/controller/TableProvider";
 import isEqual from "fast-deep-equal";
@@ -20,13 +20,21 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   const [activeViewConfig, setActiveViewConfig] =
     useState<CachedTableState | null>(null);
 
-  /* ----------------------------- Queries ----------------------------- */
+  const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
+  const didInitDefaultViewRef = useRef(false);
 
-  const viewsQuery = trpc.views.getViews.useQuery({ tableId });
-  const defaultViewQuery = trpc.views.getDefaultView.useQuery({ tableId });
+  /* ----------------------------- Queries ----------------------------- */
+  const viewsQuery = trpc.views.getViews.useQuery(
+    { tableId },
+    { enabled: isValidTableId }
+  );
+
+  const defaultViewQuery = trpc.views.getDefaultView.useQuery(
+    { tableId },
+    { enabled: isValidTableId }
+  );
 
   /* -------------------------- Current Config -------------------------- */
-
   const currentConfig = useMemo(
     () => ({
       sorting: table.getState().sorting,
@@ -45,12 +53,10 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   );
 
   const isConfigValid = parsedConfig.success;
-
   const isDirty =
     !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
 
   /* ---------------------------- Apply View ---------------------------- */
-
   const applyView = useCallback(
     (view: { id: string; config: unknown }) => {
       if (!view?.config) return;
@@ -74,20 +80,11 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
     [table, setGlobalSearch, setActiveCell]
   );
 
-  /* ------------------------ Initial Default View ----------------------- */
-
-  useEffect(() => {
-    if (defaultViewQuery.data && activeViewId === null) {
-      applyView(defaultViewQuery.data);
-    }
-  }, [defaultViewQuery.data, activeViewId, applyView]);
-
   /* ---------------------------- Mutations ----------------------------- */
-
   const createViewMutation = trpc.views.createView.useMutation({
-    onSuccess: async () => {
-      setNewViewName("");
-      await viewsQuery.refetch();
+    onSuccess: async (res) => {
+      await Promise.all([viewsQuery.refetch(), defaultViewQuery.refetch()]);
+      applyView(res.createdView); // Apply immediately if default
     },
   });
 
@@ -104,9 +101,7 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
 
   const deleteViewMutation = trpc.views.deleteView.useMutation({
     onSuccess: async (data) => {
-      await viewsQuery.refetch();
-      await defaultViewQuery.refetch();
-
+      await Promise.all([viewsQuery.refetch(), defaultViewQuery.refetch()]);
       if (data.deletedViewId === activeViewId) {
         const next =
           defaultViewQuery.data ?? viewsQuery.data?.[0];
@@ -115,17 +110,81 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
     },
   });
 
+  /* ------------------------ Default View Setup ------------------------ */
+  useEffect(() => {
+    if (!isValidTableId) return;
+    if (
+      viewsQuery.status !== "success" ||
+      defaultViewQuery.status !== "success"
+    )
+      return;
+    if (didInitDefaultViewRef.current) return;
+
+    didInitDefaultViewRef.current = true;
+    const views = viewsQuery.data ?? [];
+    const defaultView = defaultViewQuery.data;
+
+    // No views at all: create default from current config
+    if (!defaultView && views.length === 0 && parsedConfig.success) {
+      createViewMutation.mutate({
+        tableId,
+        name: "Default Table View",
+        config: parsedConfig.data,
+        isDefault: true,
+      });
+      return;
+    }
+
+    // Views exist but no default: set first as default
+    if (!defaultView && views.length > 0) {
+      setDefaultViewMutation.mutate({ viewId: views[0]!.id });
+      applyView(views[0]!);
+    }
+  }, [
+    isValidTableId,
+    tableId,
+    viewsQuery.status,
+    defaultViewQuery.status,
+    viewsQuery.data,
+    defaultViewQuery.data,
+    parsedConfig.success,
+    parsedConfig.data,
+  ]);
+
+  useEffect(() => {
+    didInitDefaultViewRef.current = false;
+  }, [tableId]);
+
   /* ---------------------------- Handlers ------------------------------ */
+
+  // Compute suggested name dynamically
+  const suggestedName = useMemo(() => {
+    if (!newViewName.trim() || !viewsQuery.data) return "";
+
+    const existingNames = new Set(viewsQuery.data.map((v) => v.name));
+
+    if (!existingNames.has(newViewName.trim())) return newViewName.trim();
+
+    let i = 1;
+    let candidate = `${newViewName.trim()} (${i})`;
+    while (existingNames.has(candidate)) {
+      i++;
+      candidate = `${newViewName.trim()} (${i})`;
+    }
+    return candidate;
+  }, [newViewName, viewsQuery.data]);
 
   const handleCreateView = () => {
     if (!newViewName.trim() || !parsedConfig.success) return;
 
     createViewMutation.mutate({
       tableId,
-      name: newViewName,
+      name: suggestedName, // Use the auto-suggested name
       config: parsedConfig.data,
       isDefault: false,
     });
+
+    setNewViewName(""); // reset input
   };
 
   const handleUpdateView = () => {
@@ -138,7 +197,6 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   };
 
   /* ------------------------------ Render ------------------------------ */
-
   return (
     <div className="border-gray-750 w-70 shrink-0 border-r bg-gray-50 p-2 flex flex-col">
       <h4 className="mb-2 font-bold">Views</h4>
