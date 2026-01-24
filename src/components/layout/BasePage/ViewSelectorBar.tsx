@@ -89,9 +89,9 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   });
 
   const updateViewMutation = trpc.views.updateView.useMutation({
-    onSuccess: (_, vars) => {
+    onSuccess: async (_, vars) => {
       setActiveViewConfig(vars.config as CachedTableState);
-      viewsQuery.refetch();
+      await viewsQuery.refetch();
     },
   });
 
@@ -149,6 +149,9 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
     defaultViewQuery.data,
     parsedConfig.success,
     parsedConfig.data,
+    applyView,
+    createViewMutation,
+    setDefaultViewMutation,
   ]);
 
   useEffect(() => {
