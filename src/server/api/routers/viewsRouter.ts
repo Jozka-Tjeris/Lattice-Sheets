@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ViewConfigSchema } from "../viewsConfigTypes";
+import type { JsonValue } from "@prisma/client/runtime/client";
 
 export const viewsRouter = createTRPCRouter({
   // --------------------
@@ -101,7 +102,7 @@ export const viewsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const updateData: any = {};
+      const updateData: JsonValue = {};
       if (input.name) updateData.name = input.name;
       if (input.config) updateData.config = input.config;
 

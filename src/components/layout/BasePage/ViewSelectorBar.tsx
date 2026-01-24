@@ -1,72 +1,101 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api as trpc } from "~/trpc/react";
 import { useTableController } from "~/components/table/controller/TableProvider";
 import isEqual from "fast-deep-equal";
 import { ViewConfigSchema } from "~/server/api/viewsConfigTypes";
+import type { CachedTableState } from "~/components/table/controller/useTableStateCache";
 
 interface ViewSelectorBarProps {
   tableId: string;
 }
 
 export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
-  const { table, globalSearch, setGlobalSearch, setActiveCell } = useTableController();
+  const { table, globalSearch, setGlobalSearch, setActiveCell } =
+    useTableController();
 
   const [newViewName, setNewViewName] = useState("");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
-  const [activeViewConfig, setActiveViewConfig] = useState<any | null>(null);
+  const [activeViewConfig, setActiveViewConfig] =
+    useState<CachedTableState | null>(null);
 
-  // Fetch all views
+  /* ----------------------------- Queries ----------------------------- */
+
   const viewsQuery = trpc.views.getViews.useQuery({ tableId });
-
-  // Fetch default view
   const defaultViewQuery = trpc.views.getDefaultView.useQuery({ tableId });
 
-  // On first load, apply the default view
+  /* -------------------------- Current Config -------------------------- */
+
+  const currentConfig = useMemo(
+    () => ({
+      sorting: table.getState().sorting,
+      columnFilters: table.getState().columnFilters,
+      columnVisibility: table.getState().columnVisibility,
+      columnSizing: table.getState().columnSizing,
+      columnPinning: table.getState().columnPinning,
+      globalSearch,
+    }),
+    [table, globalSearch]
+  );
+
+  const parsedConfig = useMemo(
+    () => ViewConfigSchema.safeParse(currentConfig),
+    [currentConfig]
+  );
+
+  const isConfigValid = parsedConfig.success;
+
+  const isDirty =
+    !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
+
+  /* ---------------------------- Apply View ---------------------------- */
+
+  const applyView = useCallback(
+    (view: { id: string; config: unknown }) => {
+      if (!view?.config) return;
+
+      const config = view.config as CachedTableState;
+
+      table.setSorting(config.sorting ?? []);
+      table.setColumnFilters(config.columnFilters ?? []);
+      table.setColumnVisibility(config.columnVisibility ?? {});
+      table.setColumnSizing(config.columnSizing ?? {});
+      table.setColumnPinning(
+        config.columnPinning ?? { left: [], right: [] }
+      );
+
+      setGlobalSearch(config.globalSearch ?? "");
+      setActiveCell(null);
+
+      setActiveViewId(view.id);
+      setActiveViewConfig(config);
+    },
+    [table, setGlobalSearch, setActiveCell]
+  );
+
+  /* ------------------------ Initial Default View ----------------------- */
+
   useEffect(() => {
-    const defaultView = defaultViewQuery.data;
-    if (defaultView && (!activeViewId || activeViewId === defaultView.id)) {
-      applyView(defaultView);
+    if (defaultViewQuery.data && activeViewId === null) {
+      applyView(defaultViewQuery.data);
     }
-  }, [defaultViewQuery.data]);
+  }, [defaultViewQuery.data, activeViewId, applyView]);
 
-  const getCurrentConfig = () => ({
-    sorting: table.getState().sorting,
-    columnFilters: table.getState().columnFilters,
-    columnVisibility: table.getState().columnVisibility,
-    columnSizing: table.getState().columnSizing,
-    columnPinning: table.getState().columnPinning,
-    globalSearch: globalSearch,
-  });
-
-  const applyView = (view: { id: string; config: any }) => {
-    if (!view?.config) return;
-
-    const { sorting, columnFilters, columnVisibility, columnSizing, columnPinning, globalSearch } = view.config;
-
-    table.setSorting(sorting ?? []);
-    table.setColumnFilters(columnFilters ?? []);
-    table.setColumnVisibility(columnVisibility ?? {});
-    table.setColumnSizing(columnSizing ?? {});
-    table.setColumnPinning(columnPinning ?? { left: [], right: [] });
-
-    setGlobalSearch(globalSearch ?? "");
-    setActiveCell(null);
-
-    setActiveViewId(view.id);
-    setActiveViewConfig(view.config);
-  };
+  /* ---------------------------- Mutations ----------------------------- */
 
   const createViewMutation = trpc.views.createView.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       setNewViewName("");
-      viewsQuery.refetch();
+      await viewsQuery.refetch();
     },
   });
 
   const updateViewMutation = trpc.views.updateView.useMutation({
-    onSuccess: () => viewsQuery.refetch(),
+    onSuccess: (_, vars) => {
+      setActiveViewConfig(vars.config as CachedTableState);
+      viewsQuery.refetch();
+    },
   });
 
   const setDefaultViewMutation = trpc.views.setDefaultView.useMutation({
@@ -74,57 +103,41 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   });
 
   const deleteViewMutation = trpc.views.deleteView.useMutation({
-    onSuccess: (data) => {
-      viewsQuery.refetch();
+    onSuccess: async (data) => {
+      await viewsQuery.refetch();
+      await defaultViewQuery.refetch();
 
       if (data.deletedViewId === activeViewId) {
-        setActiveViewId(null);
-        setActiveViewConfig(null);
+        const next =
+          defaultViewQuery.data ?? viewsQuery.data?.[0];
+        if (next) applyView(next);
       }
     },
   });
 
+  /* ---------------------------- Handlers ------------------------------ */
+
   const handleCreateView = () => {
-    if (!newViewName.trim()) return;
-
-    const currentConfig = getCurrentConfig();
-
-    // Validate current config
-    const parsed = ViewConfigSchema.safeParse(currentConfig);
-    if (!parsed.success) {
-      console.error("Invalid view config:", parsed.error);
-      alert("Cannot save view: invalid configuration.");
-      return;
-    }
+    if (!newViewName.trim() || !parsedConfig.success) return;
 
     createViewMutation.mutate({
       tableId,
       name: newViewName,
-      config: parsed.data, // validated config
+      config: parsedConfig.data,
       isDefault: false,
     });
   };
 
   const handleUpdateView = () => {
-    if (!activeViewId) return;
-    const currentConfig = getCurrentConfig();
-    const parsed = ViewConfigSchema.safeParse(currentConfig);
-    if (!parsed.success) {
-      console.error("Invalid view config:", parsed.error);
-      alert("Cannot update view: invalid configuration.");
-      return;
-    }
+    if (!activeViewId || !parsedConfig.success) return;
 
     updateViewMutation.mutate({
       viewId: activeViewId,
-      config: parsed.data,
+      config: parsedConfig.data,
     });
   };
 
-  const isDirty = activeViewConfig && !isEqual(getCurrentConfig(), activeViewConfig);
-  // Determine if the current config is valid
-  const currentConfig = getCurrentConfig();
-  const isConfigValid = ViewConfigSchema.safeParse(currentConfig).success;
+  /* ------------------------------ Render ------------------------------ */
 
   return (
     <div className="border-gray-750 w-70 shrink-0 border-r bg-gray-50 p-2 flex flex-col">
@@ -135,17 +148,23 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
           <div
             key={view.id}
             className={`flex items-center justify-between rounded p-1 ${
-              activeViewId === view.id ? "bg-gray-200 font-medium" : "hover:bg-gray-100"
+              activeViewId === view.id
+                ? "bg-gray-200 font-medium"
+                : "hover:bg-gray-100"
             }`}
           >
             <button
               className="flex min-w-0 flex-1 items-center gap-1 text-left"
               onClick={() => applyView(view)}
             >
-              {view.isDefault && <span className="text-xs text-blue-500">★</span>}
+              {view.isDefault && (
+                <span className="text-xs text-blue-500">★</span>
+              )}
               <span className="truncate">{view.name}</span>
               {activeViewId === view.id && isDirty && (
-                <span className="ml-1 text-xs text-orange-500">Draft</span>
+                <span className="ml-1 text-xs text-orange-500">
+                  Draft
+                </span>
               )}
             </button>
 
@@ -153,7 +172,10 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
               <button
                 className="ml-2 text-xs text-gray-400 hover:text-blue-500"
                 title="Set as default"
-                onClick={() => setDefaultViewMutation.mutate({ viewId: view.id })}
+                onClick={() => {
+                  setDefaultViewMutation.mutate({ viewId: view.id });
+                  applyView(view);
+                }}
               >
                 ★
               </button>
@@ -165,8 +187,7 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
               disabled={viewsQuery.data?.length === 1}
               onClick={() => {
                 if (viewsQuery.data?.length === 1) return;
-                const confirmed = confirm(`Delete view "${view.name}"? This cannot be undone.`);
-                if (!confirmed) return;
+                if (!confirm(`Delete view "${view.name}"?`)) return;
                 deleteViewMutation.mutate({ viewId: view.id });
               }}
             >
@@ -183,11 +204,11 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
           value={newViewName}
           onChange={(e) => setNewViewName(e.target.value)}
         />
+
         <button
           className="w-full bg-blue-500 text-white rounded p-1 text-sm hover:bg-blue-600 disabled:opacity-50"
           onClick={handleCreateView}
           disabled={!newViewName.trim() || !isConfigValid}
-          title={!isConfigValid ? "Cannot save: invalid table configuration" : undefined}
         >
           Save as New View
         </button>
@@ -196,23 +217,17 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
           className="w-full bg-gray-200 text-gray-800 rounded p-1 text-sm hover:bg-gray-300 disabled:opacity-50"
           onClick={handleUpdateView}
           disabled={!activeViewId || !isDirty || !isConfigValid}
-          title={
-            !activeViewId
-              ? "Select a view to update"
-              : !isDirty
-                ? "No changes to save"
-                : !isConfigValid
-                  ? "Cannot update: invalid table configuration"
-                  : undefined
-          }
         >
           Update Selected View
         </button>
+
         <button
           className="w-full bg-gray-100 text-gray-700 rounded p-1 text-sm hover:bg-gray-200 disabled:opacity-50"
           disabled={!activeViewId || !isDirty}
           onClick={() => {
-            const view = viewsQuery.data?.find((v) => v.id === activeViewId);
+            const view = viewsQuery.data?.find(
+              (v) => v.id === activeViewId
+            );
             if (view) applyView(view);
           }}
         >
