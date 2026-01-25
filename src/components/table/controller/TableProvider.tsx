@@ -16,8 +16,10 @@ import { useTableLayout } from "./useTableLayout";
 import { useTableInteractions } from "./useTableInteractions";
 import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
+import { useTableViews } from "./useTableViews";
+import type { JsonValue } from "@prisma/client/runtime/client";
 
-export type TableProviderState = {
+export type TableStructureState = {
   rows: TableRow[];
   columns: Column[];
   cells: CellMap;
@@ -35,6 +37,8 @@ export type TableProviderState = {
   sorting: SortingState;
   columnFilters: ColumnFiltersState;
   columnSizing: ColumnSizingState;
+  columnVisibility: VisibilityState;
+  columnPinning: ColumnPinningState;
   table: Table<TableRow>;
   headerHeight: number;
   setHeaderHeight: (height: number) => void;
@@ -52,13 +56,63 @@ export type TableProviderState = {
   getPinnedColumnId: () => string | null;
 };
 
-const TableContext = createContext<TableProviderState | undefined>(undefined);
+export type TableViewState = {
+  newViewName: string;
+  setNewViewName: (viewName: string) => void;
+  activeViewId: string | null;
+  setActiveViewId: (viewId: string) => void;
+  activeViewConfig: CachedTableState | null;
+  setActiveViewConfig: (viewConfig: CachedTableState) => void;
+  currentConfig: CachedTableState;
+  isDirty: boolean;
+  isConfigValid: boolean;
+  views: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; }[];
+  defaultView: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; } | null | undefined;
+  applyView: (view: { id: string; config: unknown; }) => void;
+  resetViewConfig: () => void;
+  handleCreateView: () => void;
+  handleUpdateView: () => void;
+  handleSetDefaultView: (view: { id: string; config: unknown; }) => void;
+  handleDeleteView: (view: { id: string; config: unknown; }) => void;
+}
 
-export const useTableController = () => {
-  const ctx = useContext(TableContext);
-  if (!ctx)
-    throw new Error("useTableController must be used within TableProvider");
+const TableStructureContext = createContext<TableStructureState | undefined>(undefined);
+const TableViewContext = createContext<TableViewState | undefined>(undefined);
+
+export const useTableStructureController = () => {
+  const ctx = useContext(TableStructureContext);
+  if (!ctx) {
+    throw new Error(
+      "useTableStructureController must be used within TableProvider"
+    );
+  }
   return ctx;
+};
+
+export const useTableViewController = () => {
+  const ctx = useContext(TableViewContext);
+  if (!ctx) {
+    throw new Error(
+      "useTableViewController must be used within TableProvider"
+    );
+  }
+  return ctx;
+};
+
+/**
+ * @deprecated Prefer useTableStructureController or useTableViewController
+ */
+export const useTableController = () => {
+  const structure = useTableStructureController();
+  const views = useTableViewController();
+
+  return useMemo(
+    () => ({
+      ...structure,
+      ...views,
+    }),
+    [structure, views]
+  );
 };
 
 type TableProviderProps = {
@@ -372,7 +426,34 @@ export function TableProvider({
     }
   }, [activeCell, cellRefs]);
 
-  const contextValue = useMemo(
+  const { newViewName, setNewViewName,
+    activeViewId, setActiveViewId,
+    activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
+    isDirty, isConfigValid,
+    views, defaultView, applyView,
+    handleCreateView, handleUpdateView, handleSetDefaultView, handleDeleteView,
+  } = useTableViews(
+    tableId,
+    {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
+      globalSearch,
+    },
+    {
+      setSorting,
+      setColumnFilters,
+      setColumnVisibility,
+      setColumnSizing,
+      setColumnPinning,
+      setGlobalSearch,
+    },
+    setActiveCell
+  );
+
+  const structureValue = useMemo(
     () => ({
       rows,
       columns,
@@ -394,6 +475,8 @@ export function TableProvider({
       sorting,
       columnFilters,
       columnSizing,
+      columnVisibility,
+      columnPinning,
       headerHeight,
       setHeaderHeight,
       startVerticalResize,
@@ -415,6 +498,8 @@ export function TableProvider({
       globalSearch,
       columnFilters,
       columnSizing,
+      columnVisibility,
+      columnPinning,
       table,
       sorting,
       headerHeight,
@@ -442,9 +527,52 @@ export function TableProvider({
     ],
   );
 
+  const viewValue = useMemo(
+    () => ({
+      newViewName,
+      setNewViewName,
+      activeViewId,
+      setActiveViewId,
+      activeViewConfig,
+      setActiveViewConfig,
+      currentConfig,
+      isDirty,
+      isConfigValid,
+      views,
+      defaultView,
+      applyView,
+      resetViewConfig,
+      handleCreateView,
+      handleUpdateView,
+      handleSetDefaultView,
+      handleDeleteView,
+    }),
+    [
+      newViewName,
+      setNewViewName,
+      activeViewId,
+      setActiveViewId,
+      activeViewConfig,
+      setActiveViewConfig,
+      currentConfig,
+      isDirty,
+      isConfigValid,
+      views,
+      defaultView,
+      applyView,
+      resetViewConfig,
+      handleCreateView,
+      handleUpdateView,
+      handleSetDefaultView,
+      handleDeleteView,
+    ]
+  );
+
   return (
-    <TableContext.Provider value={contextValue}>
-      {children}
-    </TableContext.Provider>
+    <TableStructureContext.Provider value={structureValue}>
+      <TableViewContext.Provider value={viewValue}>
+        {children}
+      </TableViewContext.Provider>
+    </TableStructureContext.Provider>
   );
 }
