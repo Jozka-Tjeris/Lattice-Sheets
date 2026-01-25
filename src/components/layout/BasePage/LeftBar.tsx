@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function LeftBar() {
   return (
     <aside className="border-gray-750 w-14 flex-shrink-0 border-r bg-gray-50 h-screen bg-white border-r border-gray-200 print:hidden">
@@ -7,7 +9,7 @@ export function LeftBar() {
         <div className="flex flex-col items-center gap-2">
 
           {/* Home Button */}
-          <a
+          <Link
             href="/"
             className="relative flex h-10 w-10 items-center justify-center rounded-full cursor-pointer border border-transparent hover:bg-gray-100"
           >
@@ -18,7 +20,7 @@ export function LeftBar() {
                 <path fill="var(--colors-foreground-default)" d="M88.0781,91.8464 L66.1741,102.4224 L63.9501,103.4974 L17.7121,125.6524 C14.7811,127.0664 11.0401,124.9304 11.0401,121.6744 L11.0401,60.0884 C11.0401,58.9104 11.6441,57.8934 12.4541,57.1274 C12.7921,56.7884 13.1751,56.5094 13.5731,56.2884 C14.6781,55.6254 16.2541,55.4484 17.5941,55.9784 L87.7101,83.7594 C91.2741,85.1734 91.5541,90.1674 88.0781,91.8464"></path>
               </g>
             </svg>
-          </a>
+          </Link>
         </div>
 
         {/* Bottom section */}

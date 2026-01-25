@@ -6,7 +6,6 @@ import isEqual from "fast-deep-equal";
 import type { CachedTableState } from "./useTableStateCache";
 import { ViewConfigSchema } from "~/server/api/viewsConfigTypes";
 import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, SortingState, VisibilityState } from "@tanstack/react-table";
-import type { JsonValue } from "@prisma/client/runtime/client";
 
 type TableViewStateInput = {
   sorting: SortingState;
