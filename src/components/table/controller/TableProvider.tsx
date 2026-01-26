@@ -244,12 +244,18 @@ export function TableProvider({
     hasHydratedRef.current = true;
   }, [columns, load, cached, getIsStructureStable]);
 
+  const isOptimisticColumnId = (id: string) =>
+  id.startsWith("optimistic-col-");
+
   // After cache has loaded, perform normalization
   useEffect(() => {
     if (!cached || !columns.length) return;
-    const ids = new Set(columns.map(c => c.internalId ?? c.id));
+    console.log(cached, columns)
+    const ids = new Set(columns.map(c => c.id).filter(id => !isOptimisticColumnId(id)));
+    // Always add INDEX_COL_ID as it's a required column id stored in a view config
+    ids.add(INDEX_COL_ID);
     setCached(prev => {
-      const next = prev ? normalizeState(prev, ids) : null;
+      const next = prev ? normalizeState(prev, columns, ids) : null;
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
         return next;
       }
@@ -263,45 +269,6 @@ export function TableProvider({
       hasHydratedRef.current = true;
     }
   }, [cached]);
-
-  const saveTimeoutRef = useRef<number | null>(null);
-
-  // Debounced saving of cache
-  useEffect(() => {
-    // Only save cache if already hydrated and no structure mutations are happening
-    if(!hasHydratedRef.current) return;
-    if(!getIsStructureStable()) return;
-
-    if(saveTimeoutRef.current !== null){
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = window.setTimeout(() => {
-      save({
-        sorting,
-        columnFilters,
-        columnVisibility,
-        columnSizing,
-        columnPinning,
-        globalSearch,
-      });
-    }, 300);
-
-    return () => {
-      if (saveTimeoutRef.current !== null) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [
-    sorting,
-    columnFilters,
-    columnVisibility,
-    columnSizing,
-    columnPinning,
-    globalSearch,
-    getIsStructureStable,
-    save,
-  ]);
 
   //Flush cell updates after preset interval duration
   useEffect(() => {
@@ -514,7 +481,9 @@ export function TableProvider({
       setColumnPinning,
       setGlobalSearch,
     },
-    setActiveCell
+    setActiveCell,
+    setCached,
+    save,
   );
 
   const structureValue = useMemo(

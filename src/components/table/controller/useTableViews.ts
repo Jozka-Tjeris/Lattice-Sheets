@@ -29,7 +29,9 @@ export function useTableViews(
   tableId: string,
   state: TableViewStateInput,
   setters: TableViewSetters,
-  setActiveCell: (cell: { rowId: string; columnId: string } | null) => void
+  setActiveCell: (cell: { rowId: string; columnId: string } | null) => void,
+  setCached: (value: React.SetStateAction<CachedTableState | null>) => void,
+  save: (state: CachedTableState) => void,
 ) {
   const [newViewName, setNewViewName] = useState("");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -96,6 +98,9 @@ export function useTableViews(
       setActiveCell(null);
       setActiveViewId(view.id);
       setActiveViewConfig(config);
+      // Update cached table state to persist across page navigation
+      setCached(config);
+      save(config);
     },
     [setters, setActiveCell]
   );
@@ -104,13 +109,16 @@ export function useTableViews(
   const createViewMutation = trpc.views.createView.useMutation({
     onSuccess: async (res) => {
       await Promise.all([viewsQuery.refetch(), defaultViewQuery.refetch()]);
-      applyView(res.createdView); // Apply immediately if default
+      applyView(res.createdView); // Apply immediately
     },
   });
 
   const updateViewMutation = trpc.views.updateView.useMutation({
     onSuccess: async (_, vars) => {
       setActiveViewConfig(vars.config as CachedTableState);
+      if (vars?.config) {
+        applyView({ id: activeViewId!, config: vars.config }); // Sync cache & active config
+      }
       await viewsQuery.refetch();
     },
   });
@@ -122,12 +130,13 @@ export function useTableViews(
   });
 
   const deleteViewMutation = trpc.views.deleteView.useMutation({
-    onSuccess: async (data) => {
+    onSuccess: async (res) => {
       await Promise.all([viewsQuery.refetch(), defaultViewQuery.refetch()]);
-      if (data.deletedViewId === activeViewId) {
+      if (res.deletedViewId === activeViewId) {
         const next =
           defaultViewQuery.data ?? viewsQuery.data?.[0];
         if (next) applyView(next);
+        else resetViewConfig(); // fallback if no views remain
       }
     },
   });

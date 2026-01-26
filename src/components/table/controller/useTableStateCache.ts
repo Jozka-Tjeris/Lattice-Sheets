@@ -8,6 +8,7 @@ import type {
   ColumnSizingState,
   ColumnPinningState
 } from "@tanstack/react-table";
+import type { Column } from "./tableTypes";
 
 export type CachedTableState = {
   sorting: SortingState;
@@ -20,26 +21,73 @@ export type CachedTableState = {
 
 const VERSION = 1;
 
+function toCanonicalColumnId(
+  colId: string,
+  columns: Column[]
+): string | null {
+  const col = columns.find(
+    c => c.internalId === colId || c.id === colId
+  );
+  return col?.id ?? null;
+}
+
 export function normalizeState(
   cached: CachedTableState,
+  columns: Column[],
   validColumnIds: Set<string>
 ): CachedTableState {
+  const mapId = (id: string): string | null => {
+    // If it's already valid (e.g. INDEX_COL_ID), keep it
+    if (validColumnIds.has(id)) {
+      return id;
+    }
+
+    // Otherwise try to canonicalize (optimistic --> sreal)
+    const canonical = toCanonicalColumnId(id, columns);
+
+    return canonical && validColumnIds.has(canonical)
+      ? canonical
+      : null;
+  };
+
+  // Generic type here means that T can be any object as long is contains id: string
+  const mapArray = <T extends { id: string }>(arr: T[]) =>
+    arr
+      .map(item => {
+        const id = mapId(item.id);
+        return id ? { ...item, id } : null;
+      })
+      .filter(Boolean) as T[];
+
+  // fromEntries converts [key, value] arrays into key: value pairs, entries does the reverse
+  const mapRecord = <T>(record: Record<string, T>) =>
+    Object.fromEntries(
+      Object.entries(record)
+        .map(([id, value]) => {
+          const canonical = mapId(id);
+          return canonical ? [canonical, value] : null;
+        })
+        .filter(Boolean) as [string, T][]
+    );
+
+  // arr being optional allows for inputs such as undefined, which handles edge cases well
+  const mapPinArray = (arr?: string[]) =>
+    Array.from(
+      new Set(
+        (arr ?? [])
+          .map(mapId)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
   return {
-    sorting: cached.sorting.filter(s => validColumnIds.has(s.id)),
-    columnFilters: cached.columnFilters.filter(f => validColumnIds.has(f.id)),
-    columnVisibility: Object.fromEntries(
-      Object.entries(cached.columnVisibility).filter(([id]) =>
-        validColumnIds.has(id)
-      )
-    ),
-    columnSizing: Object.fromEntries(
-      Object.entries(cached.columnSizing).filter(([id]) =>
-        validColumnIds.has(id)
-      )
-    ),
+    sorting: mapArray(cached.sorting),
+    columnFilters: mapArray(cached.columnFilters),
+    columnVisibility: mapRecord(cached.columnVisibility),
+    columnSizing: mapRecord(cached.columnSizing),
     columnPinning: {
-      left: cached.columnPinning.left?.filter(id => validColumnIds.has(id)) ?? [],
-      right: cached.columnPinning.right?.filter(id => validColumnIds.has(id)) ?? [],
+      left: mapPinArray(cached.columnPinning.left),
+      right: mapPinArray(cached.columnPinning.right),
     },
     globalSearch: cached.globalSearch,
   };
@@ -49,7 +97,7 @@ export function useTableStateCache(tableId: string) {
   const storageKey = `table-ui-state:${tableId}:v${VERSION}`;
 
   const load = useCallback(
-    (validColumnIds?: string[]): CachedTableState | null => {
+    (validColumnIds?: string[], columns?: Column[]): CachedTableState | null => {
       if (typeof window === "undefined") return null;
 
       try {
@@ -65,6 +113,7 @@ export function useTableStateCache(tableId: string) {
 
         return normalizeState(
           parsed,
+          columns ?? [],
           new Set(validColumnIds)
         );
       } catch {
