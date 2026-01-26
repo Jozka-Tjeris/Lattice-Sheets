@@ -7,12 +7,7 @@ const ColumnPinningSchema = z.object({
 });
 
 // Define schema for column sizing
-const ColumnSizingSchema = z.record(
-  z.object({
-    size: z.number().optional(),
-    flex: z.number().optional(),
-  })
-);
+const ColumnSizingSchema = z.record(z.number());
 
 // Define schema for column visibility
 const ColumnVisibilitySchema = z.record(z.boolean());
