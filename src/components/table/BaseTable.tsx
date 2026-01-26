@@ -1,11 +1,11 @@
 "use client";
 
-import { useTableController } from "@/components/table/controller/TableProvider";
+import { useTableStructureController } from "@/components/table/controller/TableProvider";
 import { TableHeader } from "./TableHeader";
 import { TableBody } from "./TableBody";
 
 export function BaseTable() {
-  const { table, sorting } = useTableController();
+  const { table, sorting } = useTableStructureController();
 
   return (
     <table

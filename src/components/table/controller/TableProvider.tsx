@@ -18,6 +18,7 @@ import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 import { useTableViews } from "./useTableViews";
 import type { JsonValue } from "@prisma/client/runtime/client";
+import { useVirtualizer, Virtualizer } from "@tanstack/react-virtual";
 
 export type TableStructureState = {
   rows: TableRow[];
@@ -54,6 +55,8 @@ export type TableStructureState = {
   togglePinColumn: (columnId: string) => void;
   isColumnPinned: (columnId: string) => boolean;
   getPinnedColumnId: () => string | null;
+  mainScrollRef: React.RefObject<HTMLDivElement | null>;
+  rowVirtualizer: Virtualizer<HTMLDivElement, Element>;
 };
 
 export type TableViewState = {
@@ -162,6 +165,8 @@ export function TableProvider({
     left: [],
     right: [],
   });
+
+  const mainScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!cached) return;
@@ -336,6 +341,19 @@ export function TableProvider({
     return () => clearInterval(interval);
   }, [updateCellsMutation, pendingCellUpdatesRef, structureMutationInFlightRef]);
 
+  // Focus effect
+  useEffect(() => {
+    if (!activeCell) return;
+    const el = cellRefs.current[`${activeCell.rowId}:${activeCell.columnId}`];
+    if (
+      el &&
+      document.activeElement?.tagName !== "INPUT" &&
+      document.activeElement !== el
+    ) {
+      el.focus();
+    }
+  }, [activeCell, cellRefs]);
+
   // STABLE DATA: We return original row references
   const tableData = useMemo(() => {
     const sorted = [...rows].sort((a, b) => a.order - b.order);
@@ -379,11 +397,23 @@ export function TableProvider({
   }, [updateCell, registerRef, setActiveCell]); // Note: cells is NOT a dependency here
 
   const tableColumns = useMemo<ColumnDef<TableRow, CellValue>[]>(() => {
-    return columns.map((col) => {
+    const rowIndexColumn: ColumnDef<TableRow, CellValue> = {
+      id: "__row_index__",
+      header: "#",
+      size: 60, // fixed width
+      minSize: 60,
+      maxSize: 60,
+      enableSorting: false,
+      enableResizing: false,
+      cell: ({ row }) => row.index + 1,
+      meta: { columnType: "number", pinned: true },
+    };
+
+    const dynamicColumns = columns.map((col) => {
       const colId = col.internalId ?? col.id;
       return {
         id: colId,
-        accessorFn: (row) => cells[`${row.internalId ?? row.id}:${colId}`],
+        accessorFn: (row: { internalId: string; id: string; }) => cells[`${row.internalId ?? row.id}:${colId}`],
         header: col.label,
         size: col.width ?? DEFAULT_COL_WIDTH,
         minSize: MIN_COL_WIDTH,
@@ -393,6 +423,8 @@ export function TableProvider({
         cell: CellRenderer,
       };
     });
+
+    return [rowIndexColumn, ...dynamicColumns];
     // We include cells here so the accessorFn updates, 
     // but because CellRenderer is stable, the TableCell won't unmount.
   }, [columns, cells, CellRenderer, DEFAULT_COL_WIDTH, MIN_COL_WIDTH, MAX_COL_WIDTH]);
@@ -400,7 +432,16 @@ export function TableProvider({
   const table = useReactTable({
     data: tableData,
     columns: tableColumns,
-    state: { sorting, columnFilters, columnVisibility, columnSizing, columnPinning },
+    state: { 
+      sorting, 
+      columnFilters, 
+      columnVisibility, 
+      columnSizing, 
+      columnPinning: {
+        ...columnPinning,
+        left: ["__row_index__"] //force row index pinned
+      },
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
@@ -413,18 +454,12 @@ export function TableProvider({
     columnResizeMode: "onChange",
   });
 
-  // Focus effect
-  useEffect(() => {
-    if (!activeCell) return;
-    const el = cellRefs.current[`${activeCell.rowId}:${activeCell.columnId}`];
-    if (
-      el &&
-      document.activeElement?.tagName !== "INPUT" &&
-      document.activeElement !== el
-    ) {
-      el.focus();
-    }
-  }, [activeCell, cellRefs]);
+  const rowVirtualizer = useVirtualizer({
+    count: table.getRowModel().rows.length,
+    getScrollElement: () => mainScrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8, // buffer rows above/below viewport
+  });
 
   const { newViewName, setNewViewName,
     activeViewId, setActiveViewId,
@@ -489,6 +524,8 @@ export function TableProvider({
       togglePinColumn,
       isColumnPinned,
       getPinnedColumnId,
+      mainScrollRef,
+      rowVirtualizer,
     }),
     [
       rows,
@@ -524,6 +561,8 @@ export function TableProvider({
       togglePinColumn,
       isColumnPinned,
       getPinnedColumnId,
+      mainScrollRef,
+      rowVirtualizer,
     ],
   );
 

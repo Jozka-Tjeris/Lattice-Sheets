@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { flexRender, type Header, type SortDirection } from "@tanstack/react-table";
-import { useTableController } from "@/components/table/controller/TableProvider";
+import { useTableStructureController } from "@/components/table/controller/TableProvider";
 import {
   type ColumnType,
   type TableRow,
@@ -20,7 +20,7 @@ interface TableHeaderContentProps{
 }
 
 function TableHeaderContent({ isFiltered, isSorted, isPinned, actualId, type, header, configIcon}: TableHeaderContentProps){
-  const { handleRenameColumn, isNumericalValue } = useTableController();
+  const { handleRenameColumn, isNumericalValue } = useTableStructureController();
 
   const onFilterColumnClick = useCallback(
     (header: Header<TableRow, unknown>, columnType: string) => {
@@ -126,7 +126,7 @@ export function TableHeader() {
     handleDeleteColumn,
     headerHeight,
     startVerticalResize,
-  } = useTableController();
+  } = useTableStructureController();
 
   const headerGroups = table.getHeaderGroups();
 
@@ -151,6 +151,29 @@ export function TableHeader() {
         headerGroups.map((group) => (
           <tr key={group.id} style={{ height: headerHeight }}>
             {group.headers.map((header) => {
+              const isRowIndex = header.id === "__row_index__"; // detect row index column
+
+              if (isRowIndex) {
+                return (
+                  <th
+                    key={header.id}
+                    style={{
+                      width: header.getSize(),
+                      minWidth: header.column.columnDef.minSize,
+                      maxWidth: header.column.columnDef.maxSize,
+                      height: headerHeight,
+                      position: "sticky",
+                      top: 0,
+                      left: 0,
+                      zIndex: 40,
+                    }}
+                    className="border-r border-b bg-gray-200 px-3 py-2 font-medium text-center text-gray-500 select-none"
+                  >
+                    #
+                  </th>
+                );
+              }
+
               const isSorted = header.column.getIsSorted();
               const isFiltered = header.column.getIsFiltered();
               const isPinned = header.column.getIsPinned();
@@ -159,7 +182,7 @@ export function TableHeader() {
                 columnType: ColumnType;
                 dbId: string;
               };
-              const type = meta?.columnType;
+              const type = meta?.columnType ?? "text";
               const actualId = meta?.dbId;
               const config = COLUMN_CONFIG[type];
 

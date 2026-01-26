@@ -1,16 +1,13 @@
 "use client";
 
 import { BaseTable } from "~/components/table/BaseTable";
-import { StickyColumnsBar } from "./StickyColumnsBar";
-import { useTableController } from "~/components/table/controller/TableProvider";
-import { useCallback, useEffect, useRef } from "react";
+import { useTableStructureController } from "~/components/table/controller/TableProvider";
+import { useEffect, useRef } from "react";
 
 export function MainTableContent() {
-  const { setActiveCell, activeCell, columns } = useTableController();
+  const { setActiveCell, activeCell, columns, mainScrollRef } = useTableStructureController();
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const stickyScrollRef = useRef<HTMLDivElement>(null);
-  const mainScrollRef = useRef<HTMLDivElement>(null);
+  
 
   // Reset active cell if no columns present
   useEffect(() => {
@@ -18,15 +15,6 @@ export function MainTableContent() {
       setActiveCell(null);
     }
   }, [columns.length, activeCell, setActiveCell]);
-
-  // Synchronize the vertical scroll
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop } = e.currentTarget;
-
-    if (stickyScrollRef.current) {
-      stickyScrollRef.current.scrollTop = scrollTop;
-    }
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,14 +34,12 @@ export function MainTableContent() {
   return (
     <div
       ref={containerRef}
-      className="flex h-full w-full flex-row overflow-hidden"
+      className="flex h-full w-full flex-1 overflow-hidden"
     >
-      <StickyColumnsBar scrollRef={stickyScrollRef} />
       <div
         ref={mainScrollRef}
-        onScroll={handleScroll}
         // overscroll-none prevents overscrolling, no-scrollbar hides scrollbar
-        className="min-w-0 flex-1 overflow-auto overscroll-none no-scrollbar"
+        className="min-w-0 flex-1 overflow-auto overscroll-none"
       >
         <BaseTable />
       </div>

@@ -1,14 +1,10 @@
 import React, { useCallback } from "react";
 import { flexRender } from "@tanstack/react-table";
-import { useTableController } from "@/components/table/controller/TableProvider";
+import { useTableStructureController } from "@/components/table/controller/TableProvider";
 
-/**
- * Notice: We've removed registerRef and activeCell from props
- * as they are now managed via the table instance or Context.
- */
 export function TableBody() {
-  const { table, rows, columns, handleDeleteRow, ROW_HEIGHT, DEFAULT_COL_WIDTH, activeCell } =
-    useTableController();
+  const { table, rows, columns, handleAddRow, handleDeleteRow, ROW_HEIGHT, DEFAULT_COL_WIDTH, activeCell, rowVirtualizer } =
+    useTableStructureController();
 
   const hasRows = rows.length > 0;
   const hasColumns = columns.length > 0;
@@ -72,6 +68,7 @@ export function TableBody() {
   const leftOffsetMap: Record<string, number> = {};
   let cumulativeLeft = 0;
   columns.forEach(col => {
+    if (col.internalId === "__row_index__") return;
     if (table.getColumn(col.internalId ?? col.id)?.getIsPinned()) {
       leftOffsetMap[col.internalId ?? col.id] = cumulativeLeft;
       cumulativeLeft += col.width ?? DEFAULT_COL_WIDTH; // fallback to default width
@@ -79,52 +76,112 @@ export function TableBody() {
   });
 
   const headerGroups = table.getHeaderGroups();
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
 
   // -----------------------------
   // Render TanStack Row Model
   // -----------------------------
   return (
     <tbody>
-      {table.getRowModel().rows.map((row, idx) => (
-        <tr
-          key={row.id}
-          onContextMenu={(e) => {
-            const rowOriginal = row.original;
-            e.preventDefault();
-            e.stopPropagation();
-            handleRowRightClick(e, rowOriginal.id, idx + 1);
-          }}
-        >
-          {row.getVisibleCells().map((cell) => {
-            const isActive = activeCell?.rowId === row.id && activeCell?.columnId === cell.column.id;
-            // Active cell should be above regular cells but under pinned cells
-            // Active pinned cell should be above other cells but under headers
-            const zIdxVal = (isActive ? 5 : 0) + (cell.column.getIsPinned() ? 20 : 0);
-            return (
-              <td
-                key={cell.id}
-                className="h-full border-r border-b p-0 align-top"
-                // Tailwind cannot generate dynamic classes, must use inline styles
-                style={{ 
-                  width: cell.column.getSize(),
-                  height: ROW_HEIGHT,
-                  position: cell.column.getIsPinned() ? "sticky" : "relative",
-                  left: cell.column.getIsPinned() ? leftOffsetMap[cell.column.id] : undefined,
-                  zIndex: zIdxVal,
-                  background: cell.column.getIsPinned() ? "#fefefe" : undefined,
-                }}
-              >
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            )
-          })}
-          {/* Filler cell for add column button */}
-          <td className="h-full border-b"/>
-        </tr>
-      ))}
+      {/* Top spacer */}
+      <tr style={{ height: virtualRows[0]?.start ?? 0 }}>
+        <td colSpan={columns.length} />
+      </tr>
+      
+      {virtualRows.map((virtualRow) => {
+        const row = table.getRowModel().rows[virtualRow.index]!;
+        const idx = virtualRow.index;
+
+        return (
+          <tr
+            key={row.id}
+            onContextMenu={(e) => {
+              handleRowRightClick(e, row.id, idx + 1);
+            }}
+          >
+            {row.getVisibleCells().map((cell) => {
+              if(cell.column.columnDef.id === "__row_index__"){
+                return (
+                  <td
+                    key={cell.id}
+                    className="flex h-full border-r border-b p-0 align-top bg-gray-100 font-mono text-sm justify-center items-center"
+                    style={{
+                      width: cell.column.getSize(),
+                      height: ROW_HEIGHT,
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 20,
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                );
+              }
+              const isActive =
+                activeCell?.rowId === row.id &&
+                activeCell?.columnId === cell.column.id;
+
+              const zIdxVal = (isActive ? 5 : 0) + (cell.column.getIsPinned() ? 20 : 0);
+
+              return (
+                <td
+                  key={cell.id}
+                  className="h-full border-r border-b p-0 align-top"
+                  style={{
+                    width: cell.column.getSize(),
+                    height: ROW_HEIGHT,
+                    position: cell.column.getIsPinned() ? "sticky" : "relative",
+                    left: cell.column.getIsPinned() ? leftOffsetMap[cell.column.id] : undefined,
+                    zIndex: zIdxVal,
+                    background: cell.column.getIsPinned() ? "#fefefe" : undefined,
+                  }}
+                >
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </td>
+              );
+            })}
+            <td className="h-full border-b" />
+          </tr>
+        );
+      })}
+
+      {/* Bottom spacer */}
+      <tr style={{ height: totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) }}>
+        <td colSpan={columns.length} />
+      </tr>
       <tr>
         {/* Filler cells for padding */}
-        {headerGroups[0]?.headers.map((header, idx) => (
+        {headerGroups[0]?.headers.map((header, idx) => {
+          if(header.column.columnDef.id === "__row_index__"){
+            return (
+              <td 
+                key={idx}
+                className="text-center text-xs transition-colors bg-gray-100 border-r"
+                style={{
+                  width: header.column.getSize(),
+                  height: ROW_HEIGHT,
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 20,
+                  boxSizing: "border-box",
+                }}
+              >
+                <button
+                  onClick={() => {handleAddRow(rows.length + 1)}}
+                  disabled={!hasColumns}
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded text-lg leading-none text-white shadow-sm transition 
+                    ${hasColumns ? 
+                      "bg-green-500 hover:bg-green-600" 
+                      : "bg-gray-400 hover:bg-gray-500"}
+                    `}
+                >
+                  +
+                </button>
+              </td>
+            )
+          }
+          return (
           <td key={idx} className="h-full border-r"
             style={{ 
               width: header.column.getSize(), 
@@ -135,7 +192,7 @@ export function TableBody() {
               background: "#fefefe",
             }}
           />
-        ))}
+        )})}
       </tr>
     </tbody>
   );
