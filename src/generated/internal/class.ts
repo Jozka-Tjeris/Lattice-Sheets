@@ -17,8 +17,8 @@ import type * as Prisma from "./prismaNamespace"
 
 const config: runtime.GetPrismaClientConfig = {
   "previewFeatures": [],
-  "clientVersion": "7.2.0",
-  "engineVersion": "0c8ef2ce45c83248ab3df073180d5eda9e8be7a3",
+  "clientVersion": "7.3.0",
+  "engineVersion": "9d6ad21cbbceab97458517b147a6a09ff43aa735",
   "activeProvider": "postgresql",
   "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\ngenerator client {\n  provider = \"prisma-client\"\n  output   = \"../src/generated\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\n// ---------------- NextAuth, User and Post Models  ----------------\nmodel Post {\n  id        Int      @id @default(autoincrement())\n  name      String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  createdBy   User   @relation(fields: [createdById], references: [id])\n  createdById String\n\n  @@index([name])\n}\n\nmodel Account {\n  id                       String  @id @default(cuid())\n  userId                   String\n  type                     String\n  provider                 String\n  providerAccountId        String\n  refresh_token            String? // @db.Text\n  access_token             String? // @db.Text\n  expires_at               Int?\n  token_type               String?\n  scope                    String?\n  id_token                 String? // @db.Text\n  session_state            String?\n  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)\n  refresh_token_expires_in Int?\n\n  @@unique([provider, providerAccountId])\n}\n\nmodel Session {\n  id           String   @id @default(cuid())\n  sessionToken String   @unique\n  userId       String\n  expires      DateTime\n  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)\n}\n\nmodel User {\n  id            String    @id @default(cuid())\n  name          String?\n  email         String?   @unique\n  emailVerified DateTime?\n  image         String?\n  accounts      Account[]\n  sessions      Session[]\n  posts         Post[]\n  bases         Base[]\n}\n\nmodel VerificationToken {\n  identifier String\n  token      String   @unique\n  expires    DateTime\n\n  @@unique([identifier, token])\n}\n\n// ---------------- Airtable Related Models ----------------\n\nmodel Base {\n  id        String   @id @default(cuid())\n  name      String\n  ownerId   String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  owner  User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)\n  tables Table[]\n}\n\nmodel Table {\n  id        String   @id @default(cuid())\n  name      String\n  baseId    String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  base    Base     @relation(fields: [baseId], references: [id], onDelete: Cascade)\n  columns Column[]\n  rows    Row[]\n  views   View[]\n}\n\nmodel Column {\n  id         String   @id @default(cuid())\n  name       String\n  columnType String // \"text\" or \"number\"\n  tableId    String\n  order      Int\n  createdAt  DateTime @default(now())\n  updatedAt  DateTime @updatedAt\n\n  table Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)\n  cells Cell[]\n\n  @@index([tableId])\n}\n\nmodel Row {\n  id        String   @id @default(cuid())\n  order     Int\n  tableId   String\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  table Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)\n  cells Cell[]\n\n  @@index([tableId, order])\n}\n\nmodel Cell {\n  id        String   @id @default(cuid())\n  rowId     String\n  columnId  String\n  value     String?\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  row    Row    @relation(fields: [rowId], references: [id], onDelete: Cascade)\n  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)\n\n  @@unique([rowId, columnId])\n  @@index([rowId])\n  @@index([columnId])\n}\n\nmodel View {\n  id        String   @id @default(cuid())\n  tableId   String\n  name      String\n  config    Json // Full CachedTableState (sorting, filters, visibility, sizing, pinning)\n  isDefault Boolean  @default(false) // Optional: mark a default view per table\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  table Table @relation(fields: [tableId], references: [id], onDelete: Cascade)\n\n  @@unique([tableId, name]) // Optional: unique names per table\n  @@index([tableId])\n}\n",
   "runtimeDataModel": {
@@ -37,12 +37,14 @@ async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Modul
 }
 
 config.compilerWasm = {
-  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_bg.postgresql.mjs"),
+  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs"),
 
   getQueryCompilerWasmModule: async () => {
-    const { wasm } = await import("@prisma/client/runtime/query_compiler_bg.postgresql.wasm-base64.mjs")
+    const { wasm } = await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.mjs")
     return await decodeBase64AsWasm(wasm)
-  }
+  },
+
+  importName: "./query_compiler_fast_bg.js"
 }
 
 
