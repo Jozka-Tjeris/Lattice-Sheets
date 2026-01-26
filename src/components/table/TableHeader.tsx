@@ -157,6 +157,7 @@ export function TableHeader() {
                   <th
                     key={header.id}
                     style={{
+                      width: header.column.columnDef.size,
                       minWidth: header.column.columnDef.minSize,
                       maxWidth: header.column.columnDef.maxSize,
                       height: headerHeight,
