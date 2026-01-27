@@ -12,51 +12,67 @@ export function BaseIcon({
   tabIndex: number;
 }) {
   const { handleRenameBase, handleDeleteBase } = useBaseMutations();
+
+  // Calculate the difference in days
+  const diffInDays = Math.floor(
+    (Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  // Determine the display message
+  const timeMessage = diffInDays === 0 
+    ? "Created today" 
+    : `Created ${diffInDays} ${diffInDays === 1 ? "day" : "days"} ago`;
+
   return (
     <div
-      className="relative flex rounded-md border border-gray-200 bg-white p-4"
+      className="group relative flex h-24 items-center rounded-md border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
       tabIndex={tabIndex}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#0d7f78] text-white">
-        <span>{name.slice(0, 2) ?? "U"}</span>
+      {/* Icon Square */}
+      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-[#0d7f78] text-xl font-medium text-white">
+        <span>{name.slice(0, 2).toUpperCase() || "U"}</span>
       </div>
 
-      <div className="ml-2 flex w-[75%] flex-col justify-center">
-        <div className="flex flex-row">
-          <a className="flex flex-1" href={`/base/${baseId}`}>
-            <h3 className="font-normal">{name}</h3>
+      {/* Content Area - Now using flex-1 for better grid scaling */}
+      <div className="ml-3 flex flex-1 flex-col min-w-0">
+        <div className="flex items-center justify-between">
+          <a className="truncate pr-2" href={`/base/${baseId}`}>
+            <h3 className="truncate font-medium text-gray-900" title={name}>
+              {name}
+            </h3>
           </a>
-          <button
-            className="w-6 cursor-pointer px-4"
-            onClick={() => {
-              const newName = prompt("Set new name for base:");
-              if (newName === null) return;
-              if (newName.trim() === "") {
-                alert("Base name cannot be empty");
-                return;
-              }
-              handleRenameBase(baseId, newName.trim());
-            }}
-          >
-            ✏️
-          </button>
-          <button
-            className="w-6 cursor-pointer px-4"
-            onClick={() => {
-              if (window.confirm(`Delete base?`)) handleDeleteBase(baseId);
-            }}
-          >
-            🗑️
-          </button>
+          
+          {/* Actions Container */}
+          <div className="flex shrink-0 items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+              onClick={() => {
+                const newName = prompt("Set new name for base:", name);
+                if (newName === null) return;
+                if (newName.trim() === "") {
+                  alert("Base name cannot be empty");
+                  return;
+                }
+                handleRenameBase(baseId, newName.trim());
+              }}
+              title="Rename"
+            >
+              ✏️
+            </button>
+            <button
+              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+              onClick={() => {
+                if (window.confirm(`Delete base "${name}"?`)) handleDeleteBase(baseId);
+              }}
+              title="Delete"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
+        
         <div className="text-xs text-gray-500">
-          <span>
-            Opened{" "}
-            {Math.floor(
-              (Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60),
-            )}{" "}
-            hours ago
-          </span>
+          <span>{timeMessage}</span>
         </div>
       </div>
     </div>

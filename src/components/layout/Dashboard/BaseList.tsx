@@ -10,7 +10,14 @@ export function BaseList() {
   if (!bases || bases.length === 0) return <div>No bases yet</div>;
 
   return (
-    <div className="space-y-2">
+    /* Changed 'space-y-2' to a responsive grid:
+       - grid: enables CSS Grid
+       - grid-cols-1: default 1 column (mobile)
+       - md:grid-cols-2: 2 columns on medium screens
+       - lg:grid-cols-3: 3 columns on large screens
+       - gap-4: spacing between the cards
+    */
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {bases.map((base, idx) => (
         <BaseIcon
           key={base.id}
