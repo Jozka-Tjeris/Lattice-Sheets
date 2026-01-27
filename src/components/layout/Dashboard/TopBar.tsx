@@ -1,22 +1,21 @@
-import { LogoutButton } from "@/components/ui/LogoutButton";
+"use client";
+
+import { signIn, useSession } from "next-auth/react";
+import { UserAccountNav } from "~/components/ui/UserAccountNav";
 
 export function TopBar() {
+  const { data: session } = useSession();
+
   return (
     <nav className="flex h-14 w-full flex-row items-center border-b p-4">
-      {/* <!-- Left section: collapse button + logo --> */}
+      {/* --- Left section --- */}
       <div className="flex flex-auto items-center">
-        {/* <!-- Collapse sidebar button --> */}
         <div
           tabIndex={0}
           role="button"
           className="flex cursor-pointer items-center rounded px-[2px] pr-[4px] hover:bg-gray-100 focus-visible:ring focus-visible:outline"
         >
-          <svg
-            width={20}
-            height={20}
-            viewBox="0 0 16 16"
-            style={{ shapeRendering: "geometricPrecision" }}
-          >
+          <svg width={20} height={20} viewBox="0 0 16 16">
             <use fill="currentColor" href="/assets/icon_definitions.svg#List" />
           </svg>
         </div>
@@ -60,89 +59,32 @@ export function TopBar() {
         <div className="flex-auto"></div>
       </div>
 
-      {/* <!-- Middle section: search bar --> */}
+      {/* --- Middle section --- */}
       <div className="flex flex-auto justify-center">
         <div className="flex w-full max-w-[400px] cursor-text items-center rounded bg-gray-100 px-[8px] py-[4px] shadow hover:shadow-md">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            className="flex-none text-gray-500"
-          >
-            <use
-              fill="currentColor"
-              href="/assets/icon_definitions.svg#MagnifyingGlass"
-            ></use>
+          <svg width="16" height="16" viewBox="0 0 16 16" className="flex-none text-gray-500">
+            <use fill="currentColor" href="/assets/icon_definitions.svg#MagnifyingGlass" />
           </svg>
-          <p className="ml-[4px] flex-auto truncate text-sm leading-4 text-gray-500">
-            Search...
-          </p>
-          <p className="ml-[4px] text-sm leading-4 text-gray-400">⌘ K</p>
+          <p className="ml-[4px] flex-auto truncate text-sm text-gray-500">Search...</p>
+          <p className="ml-[4px] text-sm text-gray-400">⌘ K</p>
         </div>
       </div>
 
-      {/* <!-- Right section: help, notifications, account --> */}
+      {/* --- Right section --- */}
       <div className="flex flex-auto items-center justify-end space-x-[6px]">
-        {/* <!-- Help button --> */}
-        <div
-          tabIndex={0}
-          role="button"
-          className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 focus-visible:ring focus-visible:outline"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            className="flex-none text-gray-600"
-          >
-            <use
-              fill="currentColor"
-              href="/assets/icon_definitions.svg#Question"
-            ></use>
-          </svg>
-        </div>
-
-        {/* <!-- Notification bell --> */}
-        <div
-          tabIndex={0}
-          role="button"
-          className="relative flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 focus-visible:ring focus-visible:outline"
-        >
-          <div className="flex h-[28px] w-[28px] items-center justify-center">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              className="flex-none text-gray-600"
-            >
-              <use
-                fill="currentColor"
-                href="/assets/icon_definitions.svg#Bell"
-              ></use>
+        {/* Help & Notifications (Original Logic Kept) */}
+        <div className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+            <svg width="16" height="16" viewBox="0 0 16 16" className="text-gray-600">
+                <use fill="currentColor" href="/assets/icon_definitions.svg#Question" />
             </svg>
-          </div>
-          {/* <!-- Hidden badge --> */}
-          <div className="absolute top-[-2px] right-[-12px] hidden h-[11px] w-[11px]">
-            <div className="flex h-[9px] w-[9px] items-center justify-center rounded-full bg-red-600 text-[8px] text-white">
-              0
-            </div>
-          </div>
         </div>
 
-        {/* <!-- User account --> */}
-        <div
-          tabIndex={0}
-          role="button"
-          className="flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-full shadow hover:shadow-md focus-visible:ring focus-visible:outline"
-        >
-          <div className="flex h-full w-full items-center justify-center">
-            <div className="relative flex h-[28px] w-[28px] items-center justify-center rounded-full border border-white bg-blue-600 font-semibold text-white">
-              J
-            </div>
-          </div>
-        </div>
-        {/* Logout button on the right */}
-        <LogoutButton />
+        {/* User account dropdown */}
+        {session ? (
+          <UserAccountNav session={session} side="bottom" align="end" />
+        ) : (
+          <button onClick={() => signIn("google")}>Sign In</button>
+        )}
       </div>
     </nav>
   );

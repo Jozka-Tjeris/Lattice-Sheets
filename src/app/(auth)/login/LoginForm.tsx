@@ -126,7 +126,7 @@ export default function LoginForm() {
             <g
               id="White-Logo-Square-"
               stroke="none"
-              stroke-width="1"
+              strokeWidth="1"
               fill="none"
               fillRule="evenodd"
             >
