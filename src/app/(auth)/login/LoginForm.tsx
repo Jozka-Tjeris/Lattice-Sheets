@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 export default function LoginForm() {
   return (
@@ -35,7 +36,7 @@ export default function LoginForm() {
       </div>
 
       <h1 className="mb-8 text-center text-3xl font-semibold">
-        Sign in to Airtable
+        Welcome to "Not Airtable"
       </h1>
 
       <div className="flex flex-col items-center justify-center p-8">
@@ -73,7 +74,7 @@ export default function LoginForm() {
             </div>
 
             <button
-              className="w-full rounded-lg bg-blue-500 py-3 text-white shadow-md focus:outline-none disabled:opacity-50"
+              className="w-full rounded-lg bg-gray-500 py-3 text-white shadow-md focus:outline-none disabled:opacity-50"
               type="submit"
               disabled
             >
@@ -86,7 +87,7 @@ export default function LoginForm() {
           <p className="text-lg text-gray-600">or</p>
         </div>
 
-        <button className="border-gray-450 mb-1 flex w-full max-w-lg cursor-pointer items-center justify-center gap-2 rounded-lg border-1 py-3 shadow-md">
+        <button className="border-gray-450 mb-1 flex w-full max-w-lg cursor-pointer items-center justify-center gap-2 rounded-lg border-1 py-3 shadow-md bg-gray-300">
           Sign in with Single Sign On
         </button>
 
@@ -121,7 +122,7 @@ export default function LoginForm() {
           Continue with Google
         </button>
 
-        <a className="border-gray-450 flex w-full max-w-lg cursor-pointer items-center justify-center gap-2 rounded-lg border-1 py-3 shadow-md">
+        <a className="border-gray-450 flex w-full max-w-lg cursor-pointer items-center justify-center gap-2 rounded-lg border-1 py-3 shadow-md bg-gray-300">
           <svg width="16" height="16" viewBox="17 17 18 18" fill="none">
             <g
               id="White-Logo-Square-"
@@ -142,9 +143,15 @@ export default function LoginForm() {
         </a>
 
         <p className="mt-8 text-center text-sm">
-          New to Airtable?{" "}
-          <a className="text-blue-600 hover:underline">Create an account</a>{" "}
-          instead
+          New here? Use a{" "}
+          <a
+            className="text-blue-600 hover:underline cursor-pointer" 
+            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          >
+            Google account
+          </a>
+          <br/>
+          It's the only way to sign in right now ¯\_(ツ)_/¯
         </p>
       </div>
     </div>
