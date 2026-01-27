@@ -6,7 +6,7 @@ export function ViewSelectorBar() {
   const { newViewName,
     setNewViewName,
     activeViewId,
-    isDirty,
+    isViewDirty,
     isConfigValid,
     views,
     applyView,
@@ -38,7 +38,7 @@ export function ViewSelectorBar() {
                 <span className="text-xs text-blue-500">★</span>
               )}
               <span className="truncate">{view.name}</span>
-              {activeViewId === view.id && isDirty && (
+              {activeViewId === view.id && isViewDirty && (
                 <span className="ml-1 text-xs text-orange-500">
                   Draft
                 </span>
@@ -90,14 +90,14 @@ export function ViewSelectorBar() {
         <button
           className="w-full bg-gray-200 text-gray-800 rounded p-1 text-sm hover:bg-gray-300 disabled:opacity-50"
           onClick={handleUpdateView}
-          disabled={!activeViewId || !isDirty || !isConfigValid}
+          disabled={!activeViewId || !isViewDirty || !isConfigValid}
         >
           Update Selected View
         </button>
 
         <button
           className="w-full bg-gray-100 text-gray-700 rounded p-1 text-sm hover:bg-gray-200 disabled:opacity-50"
-          disabled={!activeViewId || !isDirty}
+          disabled={!activeViewId || !isViewDirty}
           onClick={() => {
             const view = views.find(
               (v) => v.id === activeViewId

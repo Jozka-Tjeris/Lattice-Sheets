@@ -65,7 +65,7 @@ export type TableViewState = {
   activeViewConfig: CachedTableState | null;
   setActiveViewConfig: (viewConfig: CachedTableState) => void;
   currentConfig: CachedTableState;
-  isDirty: boolean;
+  isViewDirty: boolean;
   isConfigValid: boolean;
   views: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; }[];
   defaultView: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; } | null | undefined;
@@ -228,22 +228,6 @@ export function TableProvider({
     setActiveCell, registerRef, updateCell, isNumericalValue,
   } = useTableInteractions(null, tableId, rowsRef, columnsRef, setCells);
 
-  const { handleAddRow, handleDeleteRow, 
-    handleAddColumn, handleDeleteColumn, handleRenameColumn, 
-    getIsStructureStable, structureMutationInFlightRef 
-  } = useTableStructure(tableId, setRows, setColumns, columnsRef);
-
-  //Perform initial cache loading
-  useEffect(() => {
-    if (!columns.length) return;
-    if(!getIsStructureStable()) return;
-    if(cached) return;
-
-    setCached(load());
-
-    hasHydratedRef.current = true;
-  }, [columns, load, cached, getIsStructureStable]);
-
   const isOptimisticColumnId = (id: string) =>
   id.startsWith("optimistic-col-");
 
@@ -269,21 +253,6 @@ export function TableProvider({
       hasHydratedRef.current = true;
     }
   }, [cached]);
-
-  //Flush cell updates after preset interval duration
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (structureMutationInFlightRef.current > 0) return;
-      if (pendingCellUpdatesRef.current.length === 0) return;
-
-      const updatesToSend = [...pendingCellUpdatesRef.current];
-      pendingCellUpdatesRef.current = [];
-
-      updateCellsMutation.mutate(updatesToSend);
-    }, 300); // every 300ms, adjust as needed
-
-    return () => clearInterval(interval);
-  }, [updateCellsMutation, pendingCellUpdatesRef, structureMutationInFlightRef]);
 
   // Focus effect
   useEffect(() => {
@@ -460,9 +429,10 @@ export function TableProvider({
   const { newViewName, setNewViewName,
     activeViewId, setActiveViewId,
     activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
-    isDirty, isConfigValid,
+    isViewDirty, isConfigValid,
     views, defaultView, applyView,
     handleCreateView, handleUpdateView, handleSetDefaultView, handleDeleteView,
+    onStructureCommitted,
   } = useTableViews(
     tableId,
     {
@@ -484,7 +454,40 @@ export function TableProvider({
     setActiveCell,
     setCached,
     save,
+    columns,
+    INDEX_COL_ID,
   );
+
+  const { handleAddRow, handleDeleteRow, 
+    handleAddColumn, handleDeleteColumn, handleRenameColumn, 
+    getIsStructureStable, structureMutationInFlightRef 
+  } = useTableStructure(tableId, setRows, setColumns, columnsRef, isViewDirty, onStructureCommitted);
+
+  //Perform initial cache loading
+  useEffect(() => {
+    if (!columns.length) return;
+    if(!getIsStructureStable()) return;
+    if(cached) return;
+
+    setCached(load());
+
+    hasHydratedRef.current = true;
+  }, [columns, load, cached, getIsStructureStable]);
+
+    //Flush cell updates after preset interval duration
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (structureMutationInFlightRef.current > 0) return;
+      if (pendingCellUpdatesRef.current.length === 0) return;
+
+      const updatesToSend = [...pendingCellUpdatesRef.current];
+      pendingCellUpdatesRef.current = [];
+
+      updateCellsMutation.mutate(updatesToSend);
+    }, 300); // every 300ms, adjust as needed
+
+    return () => clearInterval(interval);
+  }, [updateCellsMutation, pendingCellUpdatesRef, structureMutationInFlightRef]);
 
   const structureValue = useMemo(
     () => ({
@@ -571,7 +574,7 @@ export function TableProvider({
       activeViewConfig,
       setActiveViewConfig,
       currentConfig,
-      isDirty,
+      isViewDirty,
       isConfigValid,
       views,
       defaultView,
@@ -590,7 +593,7 @@ export function TableProvider({
       activeViewConfig,
       setActiveViewConfig,
       currentConfig,
-      isDirty,
+      isViewDirty,
       isConfigValid,
       views,
       defaultView,

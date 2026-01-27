@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { api as trpc } from "~/trpc/react";
 import isEqual from "fast-deep-equal";
-import type { CachedTableState } from "./useTableStateCache";
+import { normalizeState, type CachedTableState } from "./useTableStateCache";
 import { ViewConfigSchema } from "~/server/api/viewsConfigTypes";
 import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, SortingState, VisibilityState } from "@tanstack/react-table";
+import type { Column } from "./tableTypes";
 
 type TableViewStateInput = {
   sorting: SortingState;
@@ -25,6 +26,29 @@ type TableViewSetters = {
   setGlobalSearch: (search: string) => void;
 };
 
+function toViewConfigInput(
+  state: CachedTableState
+): {
+  sorting?: SortingState;
+  columnFilters?: ColumnFiltersState;
+  columnVisibility?: VisibilityState;
+  columnSizing?: ColumnSizingState;
+  columnPinning?: { left: string[]; right: string[] };
+  globalSearch?: string;
+} {
+  return {
+    sorting: state.sorting,
+    columnFilters: state.columnFilters,
+    columnVisibility: state.columnVisibility,
+    columnSizing: state.columnSizing,
+    columnPinning: {
+      left: state.columnPinning.left ?? [],
+      right: state.columnPinning.right ?? [],
+    },
+    globalSearch: state.globalSearch,
+  };
+}
+
 export function useTableViews(
   tableId: string,
   state: TableViewStateInput,
@@ -32,6 +56,8 @@ export function useTableViews(
   setActiveCell: (cell: { rowId: string; columnId: string } | null) => void,
   setCached: (value: React.SetStateAction<CachedTableState | null>) => void,
   save: (state: CachedTableState) => void,
+  columns: Column[],
+  INDEX_COL_ID: string,
 ) {
   const [newViewName, setNewViewName] = useState("");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -78,7 +104,7 @@ export function useTableViews(
   );
 
   const isConfigValid = parsedConfig.success;
-  const isDirty =
+  const isViewDirty =
     !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
 
   /* ---------------------------- Apply View ---------------------------- */
@@ -267,6 +293,30 @@ export function useTableViews(
     deleteViewMutation.mutate({ viewId: view.id });
   }
 
+  const onStructureCommitted = useCallback(() => {
+    if (!activeViewId) return;
+
+    const normalized = normalizeState(
+      currentConfig,
+      columns,
+      new Set(columns.map(c => c.id).concat(INDEX_COL_ID))
+    );
+
+    // Structural changes are irreversible → auto-save
+    updateViewMutation.mutate({
+      viewId: activeViewId,
+      config: toViewConfigInput(normalized),
+    });
+
+    applyView({ id: activeViewId, config: normalized });
+  }, [
+    activeViewId,
+    currentConfig,
+    columns,
+    updateViewMutation,
+    applyView,
+  ]);
+
   return {
     newViewName,
     setNewViewName,
@@ -275,7 +325,7 @@ export function useTableViews(
     activeViewConfig,
     setActiveViewConfig,
     currentConfig,
-    isDirty,
+    isViewDirty,
     isConfigValid,
     views: viewsQuery.data ?? [],
     defaultView: defaultViewQuery.data,
@@ -285,5 +335,6 @@ export function useTableViews(
     handleUpdateView,
     handleSetDefaultView,
     handleDeleteView,
+    onStructureCommitted,
   };
 }

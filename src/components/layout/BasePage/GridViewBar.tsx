@@ -18,7 +18,7 @@ export function GridViewBar() {
     views,
     defaultView,
     activeViewId,
-    isDirty,
+    isViewDirty,
     applyView,
     resetViewConfig,
     handleSetDefaultView,
@@ -56,7 +56,7 @@ export function GridViewBar() {
       </select>
 
       {/* ---------------- Unsaved Changes Indicator ---------------- */}
-      {isDirty && (
+      {isViewDirty && (
         <span className="text-xs font-medium text-orange-500">
           You have unsaved changes
         </span>
