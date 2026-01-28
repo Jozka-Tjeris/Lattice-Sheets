@@ -144,7 +144,8 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   // -----------------------
   const handleCreateTable = () => {
     const name = prompt("Enter the new table name:", "New Table");
-    if (!name?.trim()){
+    if(!name) return;
+    if(name?.trim() === ""){
       alert("New table name cannot be empty");
       return;
     }
@@ -211,7 +212,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             <main className="min-h-0 min-w-0 flex-1">
               <ContentRetriever
                 hasTables={hasTables}
-                tablesLoading={tablesQuery.isLoading}
+                tablesLoading={tablesQuery.isLoading || (activeTableId?.startsWith("optimistic-") ?? true)}
                 tablesError={tablesQuery.error?.message}
                 rowsLoading={rowsQuery.isLoading}
                 columnsLoading={columnsQuery.isLoading}

@@ -127,7 +127,7 @@ export function useTableViews(
 
   const isConfigValid = isValidTableId && parsedConfig.success;
   const isViewDirty = !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
-  const initDefaultViewConfig = { isDefault: true, viewName: "Default table view"};
+  const initDefaultViewConfig = useMemo(() => ({ isDefault: true, viewName: "Default table view" }), []);
 
   /* ---------------------------- Apply View ---------------------------- */
   const applyView = useCallback(
@@ -222,8 +222,7 @@ export function useTableViews(
         )
       );
       setActiveViewId(result.id);
-    } catch(error: any) {
-      console.log(error)
+    } catch {
       // Filter out view with optimistic id if fails
       setViews(prev => prev.filter(v => v.id !== optimisticId));
       if (activeViewId === optimisticId) {
@@ -231,7 +230,7 @@ export function useTableViews(
         setActiveViewConfig(null);
       }
     }
-  }, [userId, parsedConfig, tableId, views, activeViewId, createViewMutation]);
+  }, [userId, parsedConfig, tableId, views, activeViewId, createViewMutation, confirmStructuralChange, initDefaultViewConfig]);
 
   const handleUpdateView = useCallback(async () => {
     if(!userId) return;
@@ -272,7 +271,7 @@ export function useTableViews(
     const oldView = views.find(v => v.id === viewId);
     if (!oldView) return;
     const prevDefaultView = views.find(v => v.isDefault);
-    if(!prevDefaultView) return;
+    // Allow mutation to proceed if no default view is available
 
     // Optimistically update local view
     setViews(prev =>
@@ -290,10 +289,10 @@ export function useTableViews(
       // revert on error
       setViews(prev =>
         prev.map(v => (v.id === viewId ? oldView : 
-          (v.id === prevDefaultView?.id ? { ...v, isDefault: true} : v)))
+          (v.id === prevDefaultView?.id ? { ...v, isDefault: true} : { ...v, isDefault: false })))
       );
     }
-  }, [userId, parsedConfig, views, tableId, updateViewMutation]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation, applyView]);
 
   const handleDeleteView = useCallback(async (viewId: string) => {
     if (!userId) return;
@@ -329,7 +328,7 @@ export function useTableViews(
       // revert
       setViews(prev => [...prev, viewToDelete]);
     }
-  }, [userId, views, activeViewId, confirmStructuralChange, tableId, deleteViewMutation]);
+  }, [userId, views, activeViewId, confirmStructuralChange, tableId, deleteViewMutation, applyView]);
 
   const resetViewConfig = useCallback(() => {
     setters.setSorting([]);
@@ -379,21 +378,14 @@ export function useTableViews(
     }
 
     // No default views exist, pick first view as fallback
-    if (queryViews.length > 0) {
+    if (!defaultView && queryViews.length > 0) {
       const firstView = queryViews[0]!;
-      applyView(firstView);
-      persistAppliedView(firstView.config);
-
-      void updateViewMutation.mutateAsync({
-        tableId,
-        viewId: firstView.id,
-        config: toViewConfigInput(firstView.config),
-      });
+      void handleSetDefaultView(firstView.id);
       return;
     }
 
     // Create a view from current state if none exist
-    if (initialConfigRef.current) {
+    if (initialConfigRef.current && !queryViews.length) {
       void handleCreateView(initDefaultViewConfig);
     }
   }, [
@@ -405,9 +397,11 @@ export function useTableViews(
     applyView,
     persistAppliedView,
     userId,
+    handleSetDefaultView,
     handleCreateView,
     tableId,
     updateViewMutation,
+    initDefaultViewConfig,
   ]);
 
   useEffect(() => {
