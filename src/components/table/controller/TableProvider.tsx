@@ -57,8 +57,6 @@ export type TableStructureState = {
 };
 
 export type TableViewState = {
-  newViewName: string;
-  setNewViewName: (viewName: string) => void;
   activeViewId: string | null;
   setActiveViewId: (viewId: string) => void;
   activeViewConfig: CachedTableState | null;
@@ -424,8 +422,7 @@ export function TableProvider({
     [pinnedLeftMeta, lastPinnedLeftId]
   );
 
-  const { newViewName, setNewViewName,
-    activeViewId, setActiveViewId,
+  const { activeViewId, setActiveViewId,
     activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
     isViewDirty, isConfigValid,
     views, applyView, persistAppliedView,
@@ -565,8 +562,6 @@ export function TableProvider({
 
   const viewValue = useMemo(
     () => ({
-      newViewName,
-      setNewViewName,
       activeViewId,
       setActiveViewId,
       activeViewConfig,
@@ -584,8 +579,6 @@ export function TableProvider({
       handleDeleteView,
     }),
     [
-      newViewName,
-      setNewViewName,
       activeViewId,
       setActiveViewId,
       activeViewConfig,

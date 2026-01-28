@@ -85,7 +85,6 @@ export function useTableViews(
   const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
   const didInitDefaultViewRef = useRef(false);
 
-  const [newViewName, setNewViewName] = useState(isValidTableId ? "Default Table View" : "");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [activeViewConfig, setActiveViewConfig] = useState<CachedTableState | null>(null);
   const [views, setViews] = useState<{ id: string; name: string; config: CachedTableState; optimistic?: boolean, isDefault: boolean }[]>([]);
@@ -128,6 +127,7 @@ export function useTableViews(
 
   const isConfigValid = isValidTableId && parsedConfig.success;
   const isViewDirty = !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
+  const initDefaultViewConfig = { isDefault: true, viewName: "Default table view"};
 
   /* ---------------------------- Apply View ---------------------------- */
   const applyView = useCallback(
@@ -166,42 +166,52 @@ export function useTableViews(
     );
   }, []);
 
-  const handleCreateView = useCallback(async (isDefault?: boolean) => {
+  const handleCreateView = useCallback(async (initConfig?: typeof initDefaultViewConfig) => {
     if(!userId) return;
-    if(!newViewName.trim()) return; 
     if(!parsedConfig.success) return;
+
+    let suggestedName = "";
+    if(initConfig !== initDefaultViewConfig){
+      if(!confirmStructuralChange("Do you want to create a new view?")) return;
+      const newViewName = prompt("Enter view name:", "New view");
+      if(!newViewName) return;
+      if(newViewName?.trim() === ""){
+        alert("New view name cannot be empty");
+        return;
+      }
+      suggestedName = (() => {
+        const existingNames = new Set(views.map(v => v.name));
+        if (!existingNames.has(newViewName.trim())) return newViewName.trim();
+        let i = 1;
+        let candidate = `${newViewName.trim()} (${i})`;
+        while (existingNames.has(candidate)) { i++; candidate = `${newViewName.trim()} (${i})`; }
+        return candidate;
+      })();
+      if(!suggestedName.trim()) return;
+    }
 
     // Generate suggested name if current name already exists
     const optimisticId = `optimistic-view-${crypto.randomUUID()}`;
-    const suggestedName = (() => {
-      const existingNames = new Set(views.map(v => v.name));
-      if (!existingNames.has(newViewName.trim())) return newViewName.trim();
-      let i = 1;
-      let candidate = `${newViewName.trim()} (${i})`;
-      while (existingNames.has(candidate)) { i++; candidate = `${newViewName.trim()} (${i})`; }
-      return candidate;
-    })();
-
     const normalizedConfig = normalizeViewConfig(parsedConfig.data);
 
     const optimisticView = {
       id: optimisticId,
-      name: suggestedName,
+      name: initConfig?.viewName ?? suggestedName,
       config: normalizedConfig,
       optimistic: true,
-      isDefault: isDefault ?? false,
+      isDefault: initConfig?.isDefault ?? false,
     };
 
     setViews(prev => [...prev, optimisticView]);
     setActiveViewId(optimisticId);
     setActiveViewConfig(normalizedConfig);
-    setNewViewName("");
 
     try {
       const { result } = await createViewMutation.mutateAsync({
         tableId,
-        name: suggestedName,
+        name: initConfig?.viewName ?? suggestedName,
         config: parsedConfig.data,
+        isDefault: initConfig?.isDefault ?? false,
         optimisticId,
       });
 
@@ -212,7 +222,8 @@ export function useTableViews(
         )
       );
       setActiveViewId(result.id);
-    } catch {
+    } catch(error: any) {
+      console.log(error)
       // Filter out view with optimistic id if fails
       setViews(prev => prev.filter(v => v.id !== optimisticId));
       if (activeViewId === optimisticId) {
@@ -220,7 +231,7 @@ export function useTableViews(
         setActiveViewConfig(null);
       }
     }
-  }, [userId, newViewName, parsedConfig, tableId, views, activeViewId, createViewMutation]);
+  }, [userId, parsedConfig, tableId, views, activeViewId, createViewMutation]);
 
   const handleUpdateView = useCallback(async () => {
     if(!userId) return;
@@ -260,12 +271,14 @@ export function useTableViews(
 
     const oldView = views.find(v => v.id === viewId);
     if (!oldView) return;
+    const prevDefaultView = views.find(v => v.isDefault);
+    if(!prevDefaultView) return;
 
     // Optimistically update local view
     setViews(prev =>
-      prev.map(v => (v.id === viewId ? { ...v, config: oldView.config, isDefault: true } : v))
+      prev.map(v => (v.id === viewId ? { ...v, isDefault: true } : { ...v, isDefault: false }))
     );
-    setActiveViewConfig(oldView.config);
+    applyView(oldView);
 
     try {
       await updateViewMutation.mutateAsync({
@@ -276,9 +289,9 @@ export function useTableViews(
     } catch {
       // revert on error
       setViews(prev =>
-        prev.map(v => (v.id === viewId ? oldView : v))
+        prev.map(v => (v.id === viewId ? oldView : 
+          (v.id === prevDefaultView?.id ? { ...v, isDefault: true} : v)))
       );
-      setActiveViewConfig(oldView.config);
     }
   }, [userId, parsedConfig, views, tableId, updateViewMutation]);
 
@@ -286,14 +299,25 @@ export function useTableViews(
     if (!userId) return;
     const viewToDelete = views.find(v => v.id === viewId);
     if (!viewToDelete) return;
+    if(views.length <= 1){
+      alert("At least one view must be available");
+      return;
+    }
+    if(viewToDelete.isDefault){
+      alert("The default view cannot be deleted. Please mark the view as non-default before deleting");
+      return;
+    }
 
     if (!confirmStructuralChange(`Delete view "${viewToDelete.name}"?`)) return;
+
+    // Find default view (guaranteed to exist due to prior checks)
+    const nextView = views.find(v => v.isDefault)!;
 
     // Optimistically remove
     setViews(prev => prev.filter(v => v.id !== viewId));
     if (activeViewId === viewId) {
-      setActiveViewId(null);
-      setActiveViewConfig(null);
+      // Apply new view if current view is deleted
+      applyView(nextView);
     }
 
     try {
@@ -304,10 +328,6 @@ export function useTableViews(
     } catch {
       // revert
       setViews(prev => [...prev, viewToDelete]);
-      if (!activeViewId) {
-        setActiveViewId(viewToDelete.id);
-        setActiveViewConfig(viewToDelete.config);
-      }
     }
   }, [userId, views, activeViewId, confirmStructuralChange, tableId, deleteViewMutation]);
 
@@ -374,7 +394,7 @@ export function useTableViews(
 
     // Create a view from current state if none exist
     if (initialConfigRef.current) {
-      void handleCreateView(true);
+      void handleCreateView(initDefaultViewConfig);
     }
   }, [
     isValidTableId,
@@ -434,8 +454,6 @@ export function useTableViews(
   ]);
 
   return {
-    newViewName,
-    setNewViewName,
     activeViewId,
     setActiveViewId,
     activeViewConfig,

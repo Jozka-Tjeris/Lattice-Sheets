@@ -4,8 +4,7 @@ import { useTableViewController } from "~/components/table/controller/TableProvi
 import type { CachedTableState } from "~/components/table/controller/useTableStateCache";
 
 export function ViewSelectorBar() {
-  const { newViewName,
-    setNewViewName,
+  const {
     activeViewId,
     isViewDirty,
     isConfigValid,
@@ -64,11 +63,7 @@ export function ViewSelectorBar() {
               className="ml-2 text-xs text-gray-400 hover:text-red-500"
               title="Delete view"
               disabled={views.length === 1}
-              onClick={() => {
-                if (views.length === 1) return;
-                if (!confirm(`Delete view "${view.name}"?`)) return;
-                void handleDeleteView(view.id);
-              }}
+              onClick={() => void handleDeleteView(view.id)}
             >
               🗑
             </button>
@@ -77,17 +72,10 @@ export function ViewSelectorBar() {
       </div>
 
       <div className="mt-4 flex flex-col gap-1">
-        <input
-          className="w-full border rounded p-1 text-sm"
-          placeholder="New view name"
-          value={newViewName}
-          onChange={(e) => setNewViewName(e.target.value)}
-        />
-
         <button
-          className="w-full bg-blue-500 text-white rounded p-1 text-sm hover:bg-blue-600 disabled:opacity-50"
+          className={`w-full rounded p-1 text-sm disabled:opacity-50 ${isConfigValid ? "text-white bg-blue-500 hover:bg-blue-600 " : "text-gray bg-gray-300 hover:bg-gray-400"}`}
           onClick={handleCreateView}
-          disabled={!newViewName.trim() || !isConfigValid}
+          disabled={!isConfigValid || !isViewDirty}
         >
           Save as New View
         </button>
