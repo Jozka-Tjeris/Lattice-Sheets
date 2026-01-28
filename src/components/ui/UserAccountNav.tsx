@@ -26,7 +26,7 @@ export function UserAccountNav({ session, side = "right", align = "end" }: UserA
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-hidden bg-blue-600">
+        <button className="relative flex h-7 w-7 items-center justify-center rounded-full border border-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-hidden bg-blue-600 cursor-pointer">
           <span className="text-[10px] font-semibold text-white">{initials}</span>
           {session.user?.image && (
             <Image
