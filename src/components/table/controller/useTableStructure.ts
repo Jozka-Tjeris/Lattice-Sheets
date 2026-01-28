@@ -97,7 +97,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, columnsRef, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId]
+    [tableId, setRows, columnsRef, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation]
   );
 
   const handleAddColumn = useCallback(
@@ -109,7 +109,10 @@ export function useTableStructure(
       }
       if(!confirmStructuralChange("Do you want to add a column?")) return;
       const colLabel = prompt("Enter column name:", `Column ${orderNum + 1}`);
-      if (!colLabel) return;
+      if (!colLabel?.trim()){
+        alert("New column name cannot be empty");
+        return;
+      }
       const typeInput = prompt(
         "Enter column type (text, number) [default is text]:",
         "text",
@@ -155,7 +158,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation]
   );
 
   const handleDeleteRow = useCallback(
@@ -184,7 +187,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, isViewDirty, confirmStructuralChange, maybeCommitStructure, rows, userId]
+    [tableId, setRows, isViewDirty, confirmStructuralChange, maybeCommitStructure, rows, userId, deleteRowMutation]
   );
 
   const handleDeleteColumn = useCallback(
@@ -213,7 +216,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, deleteColumnMutation]
   );
 
   const handleRenameColumn = useCallback(
@@ -252,7 +255,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, renameColumnMutation]
   );
 
   return {

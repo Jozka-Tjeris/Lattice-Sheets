@@ -49,23 +49,25 @@ export const tableRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const base = await ctx.db.base.findFirst({
-        where: {
-          id: input.baseId,
-          ownerId: ctx.session.user.id,
-        },
-        select: { id: true },
+      where: { id: input.baseId, ownerId: ctx.session.user.id },
       });
 
       if (!base) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+        throw new TRPCError({ code: "FORBIDDEN", message: "Base not found or access denied" });
       }
 
-      return ctx.db.table.create({
-        data: {
-          name: input.name,
-          baseId: input.baseId,
-        },
+      const { result } = await enqueueTableMutation({
+        type: "createTable",
+        name: input.name,
+        baseId: input.baseId,
+        userId: ctx.session.user.id,
       });
+
+      return { 
+        result,
+        name: input.name,
+        baseId: input.baseId, 
+      }
     }),
 
   renameTable: protectedProcedure
@@ -73,16 +75,17 @@ export const tableRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      const mutationId = enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "renameTable",
         tableId: input.tableId,
         newName: input.name,
+        userId: ctx.session.user.id,
       });
 
       return {
+        result,
         tableId: input.tableId,
         name: input.name,
-        mutationId,
       };
     }),
 
@@ -91,11 +94,12 @@ export const tableRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      const mutationId = enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "deleteTable",
         tableId: input.tableId,
+        userId: ctx.session.user.id,
       });
 
-      return { tableId: input.tableId, mutationId };
+      return { result, tableId: input.tableId };
     }),
 });

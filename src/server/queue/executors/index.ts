@@ -1,6 +1,7 @@
 import { type TableMutation } from "../mutationTypes";
 import { executeAddColumn } from "./addColumn";
 import { executeAddRow } from "./addRow";
+import { executeCreateTable } from "./createTable";
 import { executeCreateView } from "./createView";
 import { executeDeleteColumn } from "./deleteColumn";
 import { executeDeleteRow } from "./deleteRow";
@@ -29,6 +30,8 @@ export async function executeMutation(mutation: TableMutation) {
       return executeDeleteColumn(mutation);
     case "renameColumn":
       return executeRenameColumn(mutation);
+    case "createTable":
+      return executeCreateTable(mutation);
     case "renameTable":
       return executeRenameTable(mutation);
     case "deleteTable":

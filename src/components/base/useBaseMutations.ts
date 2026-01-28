@@ -112,8 +112,7 @@ export function useBaseMutations() {
   const handleRenameBase = useCallback(
     (baseId: string, oldName: string) => {
       const newName = prompt("Set new name for base:", oldName);
-      if (newName === null) return;
-      if (newName.trim() === "") {
+      if (!newName?.trim()) {
         alert("Base name cannot be empty");
         return;
       }

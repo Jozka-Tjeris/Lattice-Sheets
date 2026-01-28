@@ -53,6 +53,13 @@ export type RenameColumnMutation = {
   userId: string;
 };
 
+export type CreateTableMutation = {
+  type: "createTable";
+  baseId: string;
+  name: string;
+  userId: string;
+}
+
 export type RenameTableMutation = {
   type: "renameTable";
   tableId: string;
@@ -100,6 +107,7 @@ export type TableMutation =
   | DeleteRowMutation
   | DeleteColumnMutation
   | RenameColumnMutation
+  | CreateTableMutation
   | RenameTableMutation
   | DeleteTableMutation
   | CreateViewMutation
@@ -128,6 +136,13 @@ export type MutationResults = {
   deleteRow: void;
   deleteColumn: void;
   renameColumn: void;
+  createTable: {
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    baseId: string;
+  };
   renameTable: void;
   deleteTable: void;
   createView: {

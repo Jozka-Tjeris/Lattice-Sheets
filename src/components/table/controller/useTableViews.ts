@@ -82,13 +82,13 @@ export function useTableViews(
   const { data: session } = useSession();
   const userId = session?.user?.id;
 
-  const [newViewName, setNewViewName] = useState("Default Table View");
+  const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
+  const didInitDefaultViewRef = useRef(false);
+
+  const [newViewName, setNewViewName] = useState(isValidTableId ? "Default Table View" : "");
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [activeViewConfig, setActiveViewConfig] = useState<CachedTableState | null>(null);
   const [views, setViews] = useState<{ id: string; name: string; config: CachedTableState; optimistic?: boolean, isDefault: boolean }[]>([]);
-
-  const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
-  const didInitDefaultViewRef = useRef(false);
 
   /* ----------------------------- Queries ----------------------------- */
   const viewsQuery = trpc.views.getViews.useQuery(
@@ -126,7 +126,7 @@ export function useTableViews(
     [currentConfig]
   );
 
-  const isConfigValid = parsedConfig.success;
+  const isConfigValid = isValidTableId && parsedConfig.success;
   const isViewDirty = !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
 
   /* ---------------------------- Apply View ---------------------------- */
@@ -166,7 +166,7 @@ export function useTableViews(
     );
   }, []);
 
-  const handleCreateView = useCallback(async () => {
+  const handleCreateView = useCallback(async (isDefault?: boolean) => {
     if(!userId) return;
     if(!newViewName.trim()) return; 
     if(!parsedConfig.success) return;
@@ -189,7 +189,7 @@ export function useTableViews(
       name: suggestedName,
       config: normalizedConfig,
       optimistic: true,
-      isDefault: false,
+      isDefault: isDefault ?? false,
     };
 
     setViews(prev => [...prev, optimisticView]);
@@ -220,7 +220,7 @@ export function useTableViews(
         setActiveViewConfig(null);
       }
     }
-  }, [userId, newViewName, parsedConfig, tableId, views, activeViewId]);
+  }, [userId, newViewName, parsedConfig, tableId, views, activeViewId, createViewMutation]);
 
   const handleUpdateView = useCallback(async () => {
     if(!userId) return;
@@ -251,7 +251,7 @@ export function useTableViews(
       );
       setActiveViewConfig(oldView.config);
     }
-  }, [userId, activeViewId, parsedConfig, views, tableId]);
+  }, [userId, activeViewId, parsedConfig, views, tableId, updateViewMutation]);
 
   const handleSetDefaultView = useCallback(async (viewId: string) => {
     if(!userId) return;
@@ -280,7 +280,7 @@ export function useTableViews(
       );
       setActiveViewConfig(oldView.config);
     }
-  }, [userId, parsedConfig, views, tableId]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation]);
 
   const handleDeleteView = useCallback(async (viewId: string) => {
     if (!userId) return;
@@ -309,7 +309,7 @@ export function useTableViews(
         setActiveViewConfig(viewToDelete.config);
       }
     }
-  }, [userId, views, activeViewId, confirmStructuralChange, tableId]);
+  }, [userId, views, activeViewId, confirmStructuralChange, tableId, deleteViewMutation]);
 
   const resetViewConfig = useCallback(() => {
     setters.setSorting([]);
@@ -374,7 +374,7 @@ export function useTableViews(
 
     // Create a view from current state if none exist
     if (initialConfigRef.current) {
-      void handleCreateView(); 
+      void handleCreateView(true);
     }
   }, [
     isValidTableId,
@@ -387,6 +387,7 @@ export function useTableViews(
     userId,
     handleCreateView,
     tableId,
+    updateViewMutation,
   ]);
 
   useEffect(() => {
@@ -429,6 +430,7 @@ export function useTableViews(
     setCached,
     userId,
     tableId,
+    updateViewMutation,
   ]);
 
   return {

@@ -19,45 +19,30 @@ interface BasePageShellProps {
 }
 
 export function BasePageShell({ baseId }: BasePageShellProps) {
-  // -----------------------
-  // Tables
-  // -----------------------
+  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [creatingTable, setCreatingTable] = useState(false);
+  const utils = trpc.useUtils();
+
   const tablesQuery = trpc.table.listTablesByBaseId.useQuery({ baseId });
   const hasTables = !!tablesQuery.data && tablesQuery.data.length > 0;
 
-  const [activeTableId, setActiveTableId] = useState<string | null>(null);
-  const [creatingTable, setCreatingTable] = useState(false);
-
-  const utils = trpc.useUtils();
-
-  // Auto-select first table when tables load
+  // Sync activeTableId with query results
   useEffect(() => {
     if (!activeTableId && tablesQuery.data?.length) {
-      setActiveTableId(tablesQuery.data[0]!.id);
+      const saved = localStorage.getItem(`base:${baseId}:activeTable`);
+      const exists = tablesQuery.data.find(t => t.id === saved);
+      setActiveTableId(exists ? saved : tablesQuery.data[0]!.id);
     }
-  }, [tablesQuery.data, activeTableId]);
+  }, [tablesQuery.data, activeTableId, baseId]);
 
-  // Persist last active table state per base
   useEffect(() => {
-    if (activeTableId) {
+    if (activeTableId && !activeTableId.startsWith("optimistic-")) {
       localStorage.setItem(`base:${baseId}:activeTable`, activeTableId);
     }
   }, [activeTableId, baseId]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(`base:${baseId}:activeTable`);
-    if (saved) {
-      setActiveTableId(saved);
-    }
-  }, [baseId]);
-
-  // Set active table to null if no tables are present
-  useEffect(() => {
-    if (!hasTables) setActiveTableId(null);
-  }, [hasTables]);
-
   // -----------------------
-  // Rows / Columns
+  // Data Queries
   // -----------------------
   const rowsQuery = trpc.row.getRowsWithCells.useQuery(
     { tableId: activeTableId ?? "" },
@@ -70,20 +55,15 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   );
 
   // -----------------------
-  // Create table mutation
+  // Mutations
   // -----------------------
 
   const createTableMutation = trpc.table.createTable.useMutation({
     onMutate: async ({ name }) => {
       setCreatingTable(true);
-
       await utils.table.listTablesByBaseId.cancel({ baseId });
-      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
-      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
 
-      const previousTables =
-        utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
-
+      const previousTables = utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
       const optimisticId = `optimistic-table-${crypto.randomUUID()}`;
 
       const optimisticTable = {
@@ -95,153 +75,89 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
         optimistic: true,
       };
 
-      utils.table.listTablesByBaseId.setData({ baseId }, [
-        ...previousTables,
-        optimisticTable,
-      ]);
-
+      utils.table.listTablesByBaseId.setData({ baseId }, [...previousTables, optimisticTable]);
       setActiveTableId(optimisticId);
 
       return { previousTables, optimisticId };
     },
-
-    onSuccess: (table, _vars, ctx) => {
+    onSuccess: (data, _vars, ctx) => {
       if (!ctx) return;
-
+      // 'data' is the 'result' returned from the router (the actual Table object)
       utils.table.listTablesByBaseId.setData({ baseId }, (tables = []) =>
-        tables.map((t) => (t.id === ctx.optimisticId ? table : t)),
+        tables.map((t) => (t.id === ctx.optimisticId ? data.result : t))
       );
-
-      setActiveTableId(table.id);
+      setActiveTableId(data.result.id);
     },
-
     onError: (_err, _vars, ctx) => {
-      if (!ctx) return;
-
-      utils.table.listTablesByBaseId.setData({ baseId }, ctx.previousTables);
-
-      setActiveTableId(ctx.previousTables.at(-1)?.id ?? null);
+      if (ctx?.previousTables) {
+        utils.table.listTablesByBaseId.setData({ baseId }, ctx.previousTables);
+        setActiveTableId(ctx.previousTables.at(-1)?.id ?? null);
+      }
     },
-
-    onSettled: async () => {
+    onSettled: () => {
       setCreatingTable(false);
-      await utils.table.listTablesByBaseId.invalidate({ baseId });
-      await utils.row.getRowsWithCells.cancel({ tableId: activeTableId ?? "" });
-      await utils.column.getColumns.cancel({ tableId: activeTableId ?? "" });
+      void utils.table.listTablesByBaseId.invalidate({ baseId });
     },
   });
 
   const renameTableMutation = trpc.table.renameTable.useMutation({
-    // Optimistic update
     onMutate: async ({ tableId, name }) => {
-      // Cancel any in-flight fetches for tables
       await utils.table.listTablesByBaseId.cancel({ baseId });
+      const previousTables = utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
 
-      // Snapshot previous tables for rollback
-      const previousTables =
-        utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
-
-      // Optimistically update table name
       utils.table.listTablesByBaseId.setData({ baseId }, (old) =>
-        old?.map((t) =>
-          t.id === tableId
-            ? { ...t, name } // immutable update
-            : t,
-        ),
+        old?.map((t) => (t.id === tableId ? { ...t, name } : t))
       );
-
       return { previousTables };
     },
-    // Rollback on error
-    onError: (_err, _vars, context) => {
-      if (context?.previousTables) {
-        utils.table.listTablesByBaseId.setData(
-          { baseId },
-          context.previousTables,
-        );
-      }
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previousTables) utils.table.listTablesByBaseId.setData({ baseId }, ctx.previousTables);
     },
-    // Refresh authoritative data
-    onSettled: async () => {
-      // Only need to refresh the table list
-      await utils.table.listTablesByBaseId.invalidate({ baseId });
+    onSettled: () => {
+      void utils.table.listTablesByBaseId.invalidate({ baseId });
     },
   });
 
   const deleteTableMutation = trpc.table.deleteTable.useMutation({
-    // Optimistic update
     onMutate: async ({ tableId }) => {
-      // Cancel any in-flight fetches
       await utils.table.listTablesByBaseId.cancel({ baseId });
+      const previousTables = utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
+      const filtered = previousTables.filter((t) => t.id !== tableId);
 
-      // Snapshot previous tables for rollback
-      const previousTables =
-        utils.table.listTablesByBaseId.getData({ baseId }) ?? [];
+      utils.table.listTablesByBaseId.setData({ baseId }, filtered);
 
-      // Filter out table to be deleted
-      const filteredTables = 
-        previousTables.filter((t) => t.id !== tableId);
-
-      // Optimistically remove the table from the list
-      utils.table.listTablesByBaseId.setData(
-        { baseId },
-        filteredTables,
-      );
-
-      // If the deleted table was active, update active table to first remaining or null
       if (activeTableId === tableId) {
-        setActiveTableId(filteredTables?.[0]?.id ?? null);
+        setActiveTableId(filtered[0]?.id ?? null);
       }
-
-      const nextActiveTableId =
-        activeTableId === tableId ? filteredTables[0]?.id ?? null : activeTableId;
-
-      return { previousTables, nextActiveTableId };
+      return { previousTables };
     },
-    // Rollback on error
-    onError: (_err, _vars, context) => {
-      if (context?.previousTables) {
-        utils.table.listTablesByBaseId.setData(
-          { baseId },
-          context.previousTables,
-        );
-      }
-      setActiveTableId(context?.nextActiveTableId ?? null);
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previousTables) utils.table.listTablesByBaseId.setData({ baseId }, ctx.previousTables);
     },
-    // Refresh authoritative data after mutation
-    onSettled: async () => {
-      await Promise.all([
-        utils.table.listTablesByBaseId.invalidate({ baseId }),
-        utils.row.getRowsWithCells.invalidate(),
-        utils.column.getColumns.invalidate(),
-      ]);
+    onSettled: () => {
+      void utils.table.listTablesByBaseId.invalidate({ baseId });
     },
   });
 
+  // -----------------------
+  // Event Handlers
+  // -----------------------
   const handleCreateTable = () => {
-    const newTableName = prompt("Enter the new table name:", "New Table");
-    if (newTableName === null) return;
-    if (newTableName.trim() === "") {
-      alert("New table name cannot be blank");
+    const name = prompt("Enter the new table name:", "New Table");
+    if (!name?.trim()){
+      alert("New table name cannot be empty");
       return;
     }
-    createTableMutation.mutate({
-      baseId,
-      name: newTableName.trim(),
-    });
+    createTableMutation.mutate({ baseId, name: name.trim() });
   };
 
   const handleRenameTable = (tableId: string) => {
-    const newTableName = prompt("Enter the new table name:");
-    if (newTableName === null) return;
-    if (newTableName.trim() === "") {
-      alert("New table name cannot be blank");
+    const name = prompt("Enter the new table name:");
+    if (!name?.trim()){
+      alert("New table name cannot be empty");
       return;
     }
-    renameTableMutation.mutate({
-      tableId,
-      name: newTableName.trim(),
-    });
+    renameTableMutation.mutate({ tableId, name: name.trim() });
   };
 
   const handleDeleteTable = (tableId: string) => {
@@ -251,35 +167,25 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   };
 
   // -----------------------
-  // Initial table state
+  // Transform State for Provider
   // -----------------------
-  const initialRows =
-    hasTables && rowsQuery.data
-      ? rowsQuery.data.rows.map((row, index) => ({
-          id: row.id,
-          order: index + 1,
-        }))
-      : [];
+  const initialRows = rowsQuery.data?.rows.map((row, index) => ({
+    id: row.id,
+    order: index + 1,
+  })) ?? [];
 
-  const initialCells =
-    hasTables && rowsQuery.data ? (rowsQuery.data.cells as CellMap) : {};
+  const initialCells = (rowsQuery.data?.cells as CellMap) ?? {};
 
-  const initialColumns =
-    hasTables && columnsQuery.data
-      ? columnsQuery.data.columns.map((col, index) => ({
-          id: col.id,
-          label: col.name,
-          order: index + 1,
-          columnType: col.columnType as ColumnType,
-        }))
-      : [];
+  const initialColumns = columnsQuery.data?.columns.map((col, index) => ({
+    id: col.id,
+    label: col.name,
+    order: index + 1,
+    columnType: col.columnType as ColumnType,
+  })) ?? [];
 
-  // -----------------------
-  // Render
-  // -----------------------
   return (
     <TableProvider
-      key={activeTableId}
+      key={activeTableId} // Remounts provider when table changes
       tableId={activeTableId ?? ""}
       initialRows={initialRows}
       initialColumns={initialColumns}
@@ -288,10 +194,8 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     >
       <div className="flex h-screen w-full flex-row overflow-hidden">
         <LeftBar />
-
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TopBar baseId={baseId} />
-
           <TableSelectionBar
             tables={tablesQuery.data ?? []}
             activeTableId={activeTableId}
@@ -301,12 +205,9 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             creatingTable={creatingTable}
             onDeleteTable={handleDeleteTable}
           />
-
           <GridViewBar />
-
           <div className="flex min-h-0 min-w-0 flex-1 flex-row">
             <ViewSelectorBar />
-
             <main className="min-h-0 min-w-0 flex-1">
               <ContentRetriever
                 hasTables={hasTables}
