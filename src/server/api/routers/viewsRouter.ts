@@ -52,18 +52,19 @@ export const viewsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      const mutationId = enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "createView",
         tableId: input.tableId,
         optimisticId: input.optimisticId,
         name: input.name,
         config: input.config,
         isDefault: input.isDefault,
+        userId: ctx.session.user.id,
       });
 
       return {
+        result,
         optimisticId: input.optimisticId,
-        mutationId,
       };
     }),
 
@@ -76,25 +77,26 @@ export const viewsRouter = createTRPCRouter({
         tableId: z.string(),
         viewId: z.string(),
         name: z.string().optional(),
-        config: ViewConfigSchema.optional(),
+        config: ViewConfigSchema,
         isDefault: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      const mutationId = enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "updateView",
         tableId: input.tableId,
         viewId: input.viewId,
         name: input.name,
         config: input.config,
         isDefault: input.isDefault,
+        userId: ctx.session.user.id,
       });
 
       return {
+        result,
         viewId: input.viewId,
-        mutationId,
       };
     }),
 
@@ -106,15 +108,16 @@ export const viewsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      const mutationId = enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "deleteView",
         tableId: input.tableId,
         viewId: input.viewId,
+        userId: ctx.session.user.id,
       });
 
       return {
+        result,
         viewId: input.viewId,
-        mutationId,
       };
     }),
 });

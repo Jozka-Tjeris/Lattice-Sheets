@@ -1,29 +1,30 @@
 import { executeMutation } from "./executors/index";
-import type { QueueItem, TableMutation } from "./mutationTypes";
+import type { MutationResults, QueueItem, TableMutation } from "./mutationTypes";
 
-const queues = new Map<string, QueueItem[]>();
+const queues = new Map<string, QueueItem<TableMutation>[]>();
 const running = new Set<string>();
 
-export function enqueueTableMutation(mutation: TableMutation) {
-  const mutationId = crypto.randomUUID();
+export function enqueueTableMutation<M extends TableMutation>(
+  mutation: M
+): Promise<{ result: MutationResults[M["type"]] }> {
+  return new Promise((resolve, reject) => {
+    const mutationId = crypto.randomUUID();
+    
+    const item: QueueItem<M> = {
+      id: mutationId,
+      mutation,
+      createdAt: Date.now(),
+      attempt: 0,
+      resolve,
+      reject,
+    };
 
-  const item: QueueItem = {
-    id: mutationId,
-    mutation,
-    createdAt: Date.now(),
-    attempt: 0,
-  };
+    const queue = queues.get(mutation.tableId) ?? [];
+    queue.push(item as unknown as QueueItem<TableMutation>);
+    queues.set(mutation.tableId, queue);
 
-  const queue = queues.get(mutation.tableId);
-  if (queue) {
-    queue.push(item);
-  } else {
-    queues.set(mutation.tableId, [item]);
-  }
-
-  // fire-and-forget background processing
-  void processQueue(mutation.tableId);
-  return mutationId;
+    void processQueue(mutation.tableId);
+  });
 }
 
 async function processQueue(tableId: string) {
@@ -36,7 +37,8 @@ async function processQueue(tableId: string) {
   const item = queue[0]!;
 
   try {
-    await executeMutation(item.mutation);
+    const result = await executeMutation(item.mutation);
+    item.resolve({ result });
     queue.shift();
   } catch (err) {
     item.attempt++;
@@ -44,6 +46,7 @@ async function processQueue(tableId: string) {
     // optional retry/backoff here
     if (item.attempt > 5) {
       queue.shift(); // drop permanently
+      item.reject(err);
     }
   } finally {
     running.delete(tableId);

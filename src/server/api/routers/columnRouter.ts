@@ -29,7 +29,7 @@ export const columnRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "addColumn",
         tableId: input.tableId,
         optimisticId: input.optimisticId,
@@ -39,16 +39,17 @@ export const columnRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      return { optimisticId: input.optimisticId };
+      return { result, optimisticId: input.optimisticId };
     }),
 
   deleteColumn: protectedProcedure
     .input(z.object({ tableId: z.string(), columnId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const mutationId = enqueueTableMutation({
         type: "deleteColumn",
         tableId: input.tableId,
         columnId: input.columnId,
+        userId: ctx.session.user.id
       });
 
       return { columnId: input.columnId, mutationId };
@@ -62,12 +63,13 @@ export const columnRouter = createTRPCRouter({
         newLabel: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const mutationId = enqueueTableMutation({
         type: "renameColumn",
         tableId: input.tableId,
         columnId: input.columnId,
         newLabel: input.newLabel,
+        userId: ctx.session.user.id
       });
 
       return {

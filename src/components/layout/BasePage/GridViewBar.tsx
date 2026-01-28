@@ -16,7 +16,6 @@ export function GridViewBar() {
   /* ------------------------- View state -------------------------- */
   const {
     views,
-    defaultView,
     activeViewId,
     isViewDirty,
     applyView,
@@ -36,6 +35,8 @@ export function GridViewBar() {
     setActiveCell(null);
   };
 
+  const defaultViewId = views.find((v) => v.isDefault)?.id;
+
   return (
     <div className="flex items-center gap-4 border-b bg-gray-50 px-3 py-2">
       {/* -------------------- Active View Selector -------------------- */}
@@ -50,7 +51,7 @@ export function GridViewBar() {
 
         {views.map((v) => (
           <option key={v.id} value={v.id}>
-            {v.id === defaultView?.id ? "★" : ""} {v.name}
+            {v.isDefault ? "★" : ""} {v.name}
           </option>
         ))}
       </select>
@@ -71,10 +72,10 @@ export function GridViewBar() {
       </button>
 
       {/* ---------------- Set Default ---------------- */}
-      {activeViewId && activeViewId !== defaultView?.id && (
+      {activeViewId && activeViewId !== defaultViewId && (
         <button
           onClick={() =>
-            handleSetDefaultView({ id: activeViewId, config: null })
+            handleSetDefaultView(activeViewId)
           }
           className="rounded bg-gray-200 px-2 py-1 text-xs hover:bg-gray-300"
         >

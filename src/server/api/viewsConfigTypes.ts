@@ -21,7 +21,7 @@ const ColumnFilterSchema = z.object({
 const SortingSchema = z.array(
   z.object({
     id: z.string(),
-    desc: z.boolean().optional(),
+    desc: z.boolean(),
   })
 );
 

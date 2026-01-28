@@ -17,7 +17,6 @@ import { useTableInteractions } from "./useTableInteractions";
 import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 import { useTableViews } from "./useTableViews";
-import type { JsonValue } from "@prisma/client/runtime/client";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 
 export type TableStructureState = {
@@ -67,15 +66,14 @@ export type TableViewState = {
   currentConfig: CachedTableState;
   isViewDirty: boolean;
   isConfigValid: boolean;
-  views: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; }[];
-  defaultView: { tableId: string; name: string; createdAt: Date; updatedAt: Date; id: string; config: JsonValue; isDefault: boolean; } | null | undefined;
+  views: { id: string; name: string; config: CachedTableState; isDefault: boolean; }[];
   applyView: (view: { id: string; config: unknown; }) => void;
   persistAppliedView: (config: CachedTableState) => void;
   resetViewConfig: () => void;
   handleCreateView: () => void;
   handleUpdateView: () => void;
-  handleSetDefaultView: (view: { id: string; config: unknown; }) => void;
-  handleDeleteView: (view: { id: string; config: unknown; }) => void;
+  handleSetDefaultView: (viewId: string) => void;
+  handleDeleteView: (viewId: string) => void;
 }
 
 const TableStructureContext = createContext<TableStructureState | undefined>(undefined);
@@ -430,8 +428,8 @@ export function TableProvider({
     activeViewId, setActiveViewId,
     activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
     isViewDirty, isConfigValid,
-    views, defaultView, applyView, persistAppliedView,
-    handleCreateView, handleUpdateView, handleSetDefaultView, handleDeleteView,
+    views, applyView, persistAppliedView,
+    handleCreateView, handleUpdateView, handleDeleteView, handleSetDefaultView,
     onStructureCommitted,
   } = useTableViews(
     tableId,
@@ -461,7 +459,7 @@ export function TableProvider({
   const { handleAddRow, handleDeleteRow, 
     handleAddColumn, handleDeleteColumn, handleRenameColumn, 
     getIsStructureStable, structureMutationInFlightRef 
-  } = useTableStructure(tableId, setRows, setColumns, columnsRef, isViewDirty, onStructureCommitted);
+  } = useTableStructure(tableId, rows, columns, setRows, setColumns, columnsRef, isViewDirty, onStructureCommitted);
 
   //Perform initial cache loading
   useEffect(() => {
@@ -577,7 +575,6 @@ export function TableProvider({
       isViewDirty,
       isConfigValid,
       views,
-      defaultView,
       applyView,
       persistAppliedView,
       resetViewConfig,
@@ -597,7 +594,6 @@ export function TableProvider({
       isViewDirty,
       isConfigValid,
       views,
-      defaultView,
       applyView,
       persistAppliedView,
       resetViewConfig,

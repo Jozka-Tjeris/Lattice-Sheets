@@ -1,5 +1,6 @@
 import type { ColumnType } from "~/components/table/controller/tableTypes";
 import type { ViewConfig } from "../api/viewsConfigTypes";
+import type { JsonValue } from "@prisma/client/runtime/client";
 
 export type UpdateCellsMutation = {
   type: "updateCells";
@@ -34,12 +35,14 @@ export type DeleteRowMutation = {
   type: "deleteRow";
   tableId: string;
   rowId: string;
+  userId: string;
 };
 
 export type DeleteColumnMutation = {
   type: "deleteColumn";
   tableId: string;
   columnId: string;
+  userId: string;
 };
 
 export type RenameColumnMutation = {
@@ -47,17 +50,20 @@ export type RenameColumnMutation = {
   tableId: string;
   columnId: string;
   newLabel: string;
+  userId: string;
 };
 
 export type RenameTableMutation = {
   type: "renameTable";
   tableId: string;
   newName: string;
+  userId: string;
 };
 
 export type DeleteTableMutation = {
   type: "deleteTable";
   tableId: string;
+  userId: string;
 };
 
 export type CreateViewMutation = {
@@ -67,6 +73,7 @@ export type CreateViewMutation = {
   name: string;
   config: ViewConfig;
   isDefault?: boolean;
+  userId: string;
 };
 
 export type UpdateViewMutation = {
@@ -74,14 +81,16 @@ export type UpdateViewMutation = {
   tableId: string;
   viewId: string;
   name?: string;
-  config?: ViewConfig;
+  config: ViewConfig;
   isDefault?: boolean;
+  userId: string;
 };
 
 export type DeleteViewMutation = {
   type: "deleteView";
   tableId: string;
   viewId: string;
+  userId: string;
 };
 
 export type TableMutation =
@@ -97,9 +106,49 @@ export type TableMutation =
   | UpdateViewMutation
   | DeleteViewMutation;
 
-export type QueueItem = {
+// Define what each mutation actually returns from the server
+export type MutationResults = {
+  updateCells: void;
+  addRow: {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    tableId: string;
+    order: number;
+  };
+  addColumn: {
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    columnType: string;
+    tableId: string;
+    order: number;
+  };
+  deleteRow: void;
+  deleteColumn: void;
+  renameColumn: void;
+  renameTable: void;
+  deleteTable: void;
+  createView: {
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    tableId: string;
+    config: JsonValue;
+    isDefault: boolean;
+  };
+  updateView: void;
+  deleteView: void;
+};
+
+export type QueueItem<T extends TableMutation = TableMutation> = {
   id: string;
-  mutation: TableMutation;
+  mutation: T;
   createdAt: number;
   attempt: number;
+  // Use the lookup table to find the correct result type
+  resolve: (value: { result: MutationResults[T["type"]] }) => void;
+  reject: (reason?: unknown) => void;
 };

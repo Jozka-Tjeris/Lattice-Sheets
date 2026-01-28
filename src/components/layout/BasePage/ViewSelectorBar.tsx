@@ -54,7 +54,7 @@ export function ViewSelectorBar() {
               <button
                 className="ml-2 text-xs text-gray-400 hover:text-blue-500"
                 title="Set as default"
-                onClick={() => handleSetDefaultView(view)}
+                onClick={() => handleSetDefaultView(view.id)}
               >
                 ★
               </button>
@@ -67,7 +67,7 @@ export function ViewSelectorBar() {
               onClick={() => {
                 if (views.length === 1) return;
                 if (!confirm(`Delete view "${view.name}"?`)) return;
-                handleDeleteView(view);
+                void handleDeleteView(view.id);
               }}
             >
               🗑

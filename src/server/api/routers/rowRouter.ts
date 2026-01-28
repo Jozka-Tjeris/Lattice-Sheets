@@ -30,7 +30,7 @@ export const rowRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTableAccess(ctx, input.tableId);
 
-      enqueueTableMutation({
+      const { result } = await enqueueTableMutation({
         type: "addRow",
         tableId: input.tableId,
         optimisticId: input.optimisticId,
@@ -38,16 +38,17 @@ export const rowRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      return { optimisticId: input.optimisticId };
+      return { result, optimisticId: input.optimisticId };
     }),
 
   deleteRow: protectedProcedure
     .input(z.object({ tableId: z.string(), rowId: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const mutationId = enqueueTableMutation({
         type: "deleteRow",
         tableId: input.tableId,
         rowId: input.rowId,
+        userId: ctx.session.user.id,
       });
 
       return { rowId: input.rowId, mutationId };

@@ -9,7 +9,7 @@ export async function executeCreateView(m: CreateViewMutation) {
     });
   }
 
-  await db.view.create({
+  return await db.view.create({
     data: {
       tableId: m.tableId,
       name: m.name,
