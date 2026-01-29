@@ -16,6 +16,8 @@ export function useTableStructure(
   const { data: session } = useSession();
   const userId = session?.user?.id;
 
+  const utils = trpc.useUtils();
+
   const structureMutationInFlightRef = useRef(0);
 
   const beginStructureMutation = () => {
@@ -55,8 +57,8 @@ export function useTableStructure(
   // --------------------
   const handleAddRow = useCallback(
     async (orderNum: number) => {
-      if (!userId) return; // not logged in 
-      if(columnsRef.current.length === 0) return;
+      if(!userId) return; // not logged in 
+      if(!columns.length) return;
       if(isViewDirty){
         alert("The current view must be saved before adding any rows");
         return;
@@ -102,14 +104,15 @@ export function useTableStructure(
 
   const handleAddColumn = useCallback(
     async (orderNum: number) => {
-      if (!userId) return; // not logged in
+      if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before adding any columns");
         return;
       }
       if(!confirmStructuralChange("Do you want to add a column?")) return;
       const colLabel = prompt("Enter column name:", `Column ${orderNum + 1}`);
-      if (!colLabel?.trim()){
+      if(!colLabel) return;
+      if(!colLabel?.trim()){
         alert("New column name cannot be empty");
         return;
       }
@@ -121,17 +124,29 @@ export function useTableStructure(
       const type: ColumnType = typeInput.toLowerCase().trim() === "number" ? "number" : "text";
 
       const optimisticId = `optimistic-col-${crypto.randomUUID()}`;
-      setColumns((prev) => [
+      const optimisticColumn: Column = {
+        id: optimisticId,
+        internalId: optimisticId,
+        label: colLabel,
+        order: orderNum,
+        columnType: type,
+        optimistic: true,
+      };
+      const optimisticColumnForCache = {
+        id: optimisticId,
+        name: colLabel,
+        columnType: type,
+        tableId,
+        order: orderNum,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      setColumns((prev) => [...prev, optimisticColumn]);
+      // Optimistic update in cache
+      utils.column.getColumns.setData({ tableId }, prev => ({
         ...prev,
-        {
-          id: optimisticId,
-          internalId: optimisticId,
-          label: colLabel,
-          order: orderNum,
-          columnType: type,
-          optimistic: true,
-        },
-      ]);
+        columns: prev ? [...prev.columns, optimisticColumnForCache] : [optimisticColumnForCache],
+      }));
 
       beginStructureMutation();
       try {
@@ -150,15 +165,42 @@ export function useTableStructure(
               : c
           )
         );
+        // Reconcile IDs in cache
+        utils.column.getColumns.setData({ tableId }, prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            columns: prev.columns.map(c =>
+              c.id === optimisticId
+                ? {
+                    ...c,
+                    id: result.id,
+                    name: colLabel, // optional, or result.name
+                    updatedAt: result.updatedAt,
+                    createdAt: result.createdAt,
+                  }
+                : c
+            ),
+          };
+        });
       } catch {
         // Filter out column with optimistic id
         setColumns(prev => prev.filter(c => c.id !== optimisticId));
+        // Rollback cache
+        utils.column.getColumns.setData({ tableId }, prev => {
+          if (!prev) return prev;
+
+          return {
+            ...prev,
+            columns: prev.columns.filter(c => c.id !== optimisticId),
+          };
+        });
       } finally {
         endStructureMutation();
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation, utils]
   );
 
   const handleDeleteRow = useCallback(
@@ -192,15 +234,23 @@ export function useTableStructure(
 
   const handleDeleteColumn = useCallback(
     async (columnId: string) => {
-      if (!userId) return; // not logged in
+      if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before deleting any columns");
         return;
       }
       if(!confirmStructuralChange("Do you want to delete this column?")) return;
       // Optimistic removal
-      const prevColumns = [...columns ?? []];
+      const prevColumnsLocal = [...columns ?? []];
       setColumns((prev) => prev.filter((c) => c.id !== columnId && c.internalId !== columnId));
+
+      utils.column.getColumns.setData({ tableId }, prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          columns: prev.columns.filter(c => c.id !== columnId),
+        }
+      })
 
       beginStructureMutation();
       try {
@@ -210,7 +260,23 @@ export function useTableStructure(
         });
       } catch {
         // Revert on failure
-        setColumns(prevColumns);
+        setColumns(prevColumnsLocal);
+        // Rollback cache
+        utils.column.getColumns.setData({ tableId }, prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            columns: prevColumnsLocal.map(c => ({
+              id: c.id,
+              name: c.label,          // map local -> backend shape
+              columnType: c.columnType,
+              tableId,
+              order: c.order,
+              createdAt: new Date(),   // fallback placeholder
+              updatedAt: new Date(),
+            })),
+          };
+        });
       } finally {
         endStructureMutation();
         maybeCommitStructure();
@@ -221,24 +287,36 @@ export function useTableStructure(
 
   const handleRenameColumn = useCallback(
     async (columnId: string) => {
-      if (!userId) return; // not logged in
+      if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before renaming any columns");
         return;
       }
       if(!confirmStructuralChange("Do you want to rename this column?")) return;
       const newLabel = prompt("Enter new column name:");
-      if(!newLabel || newLabel.trim() === ""){
+      if(!newLabel) return;
+      if(!newLabel?.trim()){
         alert("Column name is invalid.");
         return;
       }
       // Optimistic update
-      const prevColumns = [...columns ?? []];
+      const prevColumnsLocal = [...columns ?? []];
       setColumns((prev) =>
         prev.map((c) =>
           c.id === columnId || c.internalId === columnId ? { ...c, label: newLabel } : c
         )
       );
+
+      // Optimistic update - cache
+      utils.column.getColumns.setData({ tableId }, prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          columns: prev.columns.map(c =>
+            c.id === columnId ? { ...c, name: newLabel, updatedAt: new Date() } : c
+          ),
+        };
+      });
 
       beginStructureMutation();
       try {
@@ -249,7 +327,23 @@ export function useTableStructure(
         });
       } catch {
         // Revert on failure
-        setColumns(prevColumns);
+        setColumns(prevColumnsLocal);
+
+        utils.column.getColumns.setData({ tableId }, prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            columns: prevColumnsLocal.map(c => ({
+              id: c.id,
+              name: c.label,
+              columnType: c.columnType,
+              tableId,
+              order: c.order,
+              createdAt: new Date(), // placeholder
+              updatedAt: new Date(),
+            })),
+          };
+        });
       } finally {
         endStructureMutation();
         maybeCommitStructure();
