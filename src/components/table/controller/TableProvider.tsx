@@ -214,14 +214,13 @@ export function TableProvider({
   useEffect(() => {
     // Only sync if not initialized yet or if the local state is currently empty
     const shouldSync = !hasInitializedRows.current || rows.length === 0;
-    console.log(shouldSync, "HII")
     if (initialRows.length > 0 && shouldSync) {
       setRows(initialRows.map((r) => (
         { ...r, internalId: r.internalId ?? r.id, optimistic: false }
       )));
       hasInitializedRows.current = true;
     }
-  }, [initialRows, tableId]); // tableId ensures fresh start on navigation
+  }, [initialRows, tableId, rows.length]); // tableId ensures fresh start on navigation
 
   useEffect(() => {
     const shouldSync = !hasInitializedCols.current || columns.length === 0;
@@ -232,7 +231,7 @@ export function TableProvider({
       )));
       hasInitializedCols.current = true;
     }
-  }, [initialColumns, tableId]);
+  }, [initialColumns, tableId, columns.length]);
 
   useEffect(() => {
     const shouldSync = !hasInitializedCells.current || Object.keys(cells).length === 0;
@@ -241,7 +240,7 @@ export function TableProvider({
       setCells(initialCells);
       hasInitializedCells.current = true;
     }
-  }, [initialCells, tableId]);
+  }, [initialCells, tableId, cells]);
 
   const { ROW_HEIGHT, DEFAULT_COL_WIDTH, MIN_COL_WIDTH, MAX_COL_WIDTH, headerHeight, columnSizing, 
     setHeaderHeight, startVerticalResize, setColumnSizing 
@@ -481,7 +480,7 @@ export function TableProvider({
 
   const { handleAddRow, handleDeleteRow, 
     handleAddColumn, handleDeleteColumn, handleRenameColumn, 
-    getIsStructureStable, structureMutationInFlightRef,
+    getIsStructureStable,
     optimisticRowIdMapRef, optimisticColIdMapRef,
   } = useTableStructure(tableId, rows, columns, setRows, setColumns, isViewDirty, onStructureCommitted);
 
