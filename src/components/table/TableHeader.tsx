@@ -230,7 +230,7 @@ export function TableHeader() {
               }}
             >
               <button
-                onClick={() => handleAddColumn(columns.length + 1)}
+                onClick={() => handleAddColumn(columns.length)}
                 className="inline-flex h-6 w-6 items-center justify-center rounded bg-green-500 text-lg leading-none text-white shadow-sm transition hover:bg-green-600"
               >
                 +
@@ -253,7 +253,7 @@ export function TableHeader() {
               </span>
               <div className="flex items-center pr-4">
                 <button
-                  onClick={() => handleAddColumn(columns.length + 1)}
+                  onClick={() => handleAddColumn(columns.length)}
                   className="inline-flex h-6 w-6 items-center justify-center rounded bg-green-500 text-lg leading-none text-white shadow-sm transition hover:bg-green-600"
                 >
                   +
