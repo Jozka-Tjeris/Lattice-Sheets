@@ -67,7 +67,7 @@ async function processQueue(tableId: string) {
     item.attempt++;
     console.error("Mutation failed", item.mutation, err);
     // optional retry/backoff here
-    if (item.attempt > 5) {
+    if (item.attempt > 2) {
       queue.shift(); // drop permanently
       item.reject(err);
     }
