@@ -44,12 +44,17 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   // -----------------------
   // Data Queries
   // -----------------------
-  const rowsQuery = trpc.row.getRowsWithCells.useQuery(
+  const rowsQuery = trpc.row.getRows.useQuery(
     { tableId: activeTableId ?? "" },
     { enabled: hasTables && !!activeTableId && !creatingTable },
   );
 
   const columnsQuery = trpc.column.getColumns.useQuery(
+    { tableId: activeTableId ?? "" },
+    { enabled: hasTables && !!activeTableId && !creatingTable },
+  );
+
+  const cellsQuery = trpc.cell.getCells.useQuery(
     { tableId: activeTableId ?? "" },
     { enabled: hasTables && !!activeTableId && !creatingTable },
   );
@@ -175,7 +180,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     order: index + 1,
   })) ?? [];
 
-  const initialCells = (rowsQuery.data?.cells as CellMap) ?? {};
+  const initialCells = cellsQuery.data?.cells as CellMap ?? {};
 
   const initialColumns = columnsQuery.data?.columns.map((col, index) => ({
     id: col.id,
@@ -212,7 +217,10 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             <main className="min-h-0 min-w-0 flex-1">
               <ContentRetriever
                 hasTables={hasTables}
-                tablesLoading={tablesQuery.isLoading || (activeTableId?.startsWith("optimistic-") ?? true)}
+                tablesLoading={tablesQuery.isLoading 
+                  // If no active table id, means no tables available
+                  // Otherwise load if still optimistic
+                  || (activeTableId ? activeTableId.startsWith("optimistic-") : false)}
                 tablesError={tablesQuery.error?.message}
                 rowsLoading={rowsQuery.isLoading}
                 columnsLoading={columnsQuery.isLoading}

@@ -9,7 +9,6 @@ export function useTableStructure(
   columns: Column[],
   setRows: React.Dispatch<React.SetStateAction<TableRow[]>>,
   setColumns: React.Dispatch<React.SetStateAction<Column[]>>,
-  columnsRef: React.RefObject<Column[]>,
   isViewDirty: boolean,
   onStructureCommitted: () => void,
 ) {
@@ -32,6 +31,9 @@ export function useTableStructure(
     () => structureMutationInFlightRef.current === 0,
     []
   );
+
+  const optimisticRowIdMapRef = useRef<Record<string, string | null>>({});
+  const optimisticColIdMapRef = useRef<Record<string, string | null>>({});
 
   // IDs are guaranteed to be correct because it only commits after in-flight count hits zero
   const maybeCommitStructure = useCallback(() => {
@@ -65,6 +67,7 @@ export function useTableStructure(
       }
       if(!confirmStructuralChange("Do you want to add a row?")) return;
       const optimisticId = `optimistic-row-${crypto.randomUUID()}`;
+      optimisticRowIdMapRef.current[optimisticId] = null;
       const newRowLocal: TableRow = {
         id: optimisticId,
         internalId: optimisticId,
@@ -86,14 +89,6 @@ export function useTableStructure(
         rows: prev ? [...prev.rows, newRowCache] : [newRowCache]
       }));
 
-      utils.row.getRowsWithCells.setData({ tableId }, prev => {
-        if (!prev) return { rows: [newRowCache], cells: {} };
-        return {
-          ...prev,
-          rows: [...prev.rows, newRowCache],
-        }
-      });
-
       beginStructureMutation();
       try {
         const { result } = await addRowMutation.mutateAsync({
@@ -111,28 +106,14 @@ export function useTableStructure(
           )
         );
 
-        const realRow = {
-          id: result.id,
-          tableId,
-          createdAt: new Date(result.createdAt),
-          updatedAt: new Date(result.updatedAt),
-          order: orderNum,
-        };
         // Set real ID to row in cache
         utils.row.getRows.setData({ tableId }, prev => {
           return {
             ...prev,
-            rows: prev ? prev.rows.map(r => (r.id === optimisticId ? realRow : r)) : [realRow],
+            rows: prev ? prev.rows.map(r => r.id === optimisticId ? result : r) : [result],
           };
         });
-
-        utils.row.getRowsWithCells.setData({ tableId }, prev => {
-          if (!prev) return { rows: [realRow], cells: {} };
-          return {
-            ...prev,
-            rows: prev.rows.map(r => (r.id === optimisticId ? realRow : r)),
-          };
-        });
+        optimisticRowIdMapRef.current[optimisticId] = result.id;
       } catch {
         // Filter out row with optimistic id
         setRows((prev) => prev.filter((r) => r.id !== optimisticId));
@@ -141,14 +122,6 @@ export function useTableStructure(
         utils.row.getRows.setData({ tableId }, prev => {
           if (!prev) return prev;
           return { ...prev, rows: prev.rows.filter(r => r.id !== optimisticId) };
-        });
-
-        utils.row.getRowsWithCells.setData({ tableId }, prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            rows: prev.rows.filter(r => r.id !== optimisticId),
-          };
         });
       } finally {
         endStructureMutation();
@@ -180,6 +153,7 @@ export function useTableStructure(
       const type: ColumnType = typeInput.toLowerCase().trim() === "number" ? "number" : "text";
 
       const optimisticId = `optimistic-col-${crypto.randomUUID()}`;
+      optimisticColIdMapRef.current[optimisticId] = null;
       const optimisticColumn: Column = {
         id: optimisticId,
         internalId: optimisticId,
@@ -223,22 +197,12 @@ export function useTableStructure(
         );
         // Reconcile IDs in cache
         utils.column.getColumns.setData({ tableId }, prev => {
-          if (!prev) return prev;
           return {
             ...prev,
-            columns: prev.columns.map(c =>
-              c.id === optimisticId
-                ? {
-                    ...c,
-                    id: result.id,
-                    name: colLabel, // optional, or result.name
-                    updatedAt: result.updatedAt,
-                    createdAt: result.createdAt,
-                  }
-                : c
-            ),
+            columns: prev ? prev.columns.map(c => c.id === optimisticId ? result : c) : [result],
           };
         });
+        optimisticColIdMapRef.current[optimisticId] = result.id;
       } catch {
         // Filter out column with optimistic id
         setColumns(prev => prev.filter(c => c.id !== optimisticId));
@@ -269,8 +233,7 @@ export function useTableStructure(
       if(!confirmStructuralChange(`Delete row "${rowPosition}"?\n\nThis will remove all its cell values.`)) return;
       // Optimistic removal
       const prevRows = [...rows ?? []]; // capture current state for rollback
-      const prevRowsCache = utils.row.getRowsWithCells.getData({ tableId });
-      const prevRowsWithCells = utils.row.getRowsWithCells.getData({ tableId });
+      const prevRowsCache = utils.row.getRows.getData({ tableId });
       setRows((prev) => prev.filter((r) => r.id !== rowId && r.internalId !== rowId));
 
       // Optimistic removal from getRows cache
@@ -279,17 +242,6 @@ export function useTableStructure(
         return {
           ...prev,
           rows: prev.rows.filter(r => r.id !== rowId),
-        };
-      });
-      // Optimistic removal from getRowsWithCells cache
-      utils.row.getRowsWithCells.setData({ tableId }, prev => {
-        if (!prev) return prev;
-        const newCells = { ...prev.cells };
-        delete newCells[rowId]; // remove all cells for this row
-        return {
-          ...prev,
-          rows: prev.rows.filter(r => r.id !== rowId),
-          cells: newCells,
         };
       });
 
@@ -304,9 +256,6 @@ export function useTableStructure(
         setRows(prevRows);
         // Rollback caches
         utils.row.getRows.setData({ tableId }, prevRowsCache);
-        if (prevRowsWithCells) {
-          utils.row.getRowsWithCells.setData({ tableId }, prevRowsWithCells);
-        }
       } finally {
         endStructureMutation();
         maybeCommitStructure();
@@ -443,5 +392,7 @@ export function useTableStructure(
     handleRenameColumn,
     getIsStructureStable,
     structureMutationInFlightRef,
+    optimisticRowIdMapRef,
+    optimisticColIdMapRef,
   };
 }
