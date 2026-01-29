@@ -8,6 +8,7 @@ export type UpdateCellsMutation = {
   changes: {
     rowId: string;
     columnId: string;
+    tableId: string;
     value: string | number;
   }[];
   userId: string;

@@ -41,6 +41,7 @@ export async function executeUpdateCells(m: UpdateCellsMutation) {
           create: {
             rowId: c.rowId,
             columnId: c.columnId,
+            tableId: c.tableId,
             value,
           },
         })

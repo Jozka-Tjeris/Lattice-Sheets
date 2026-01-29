@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { assertTableAccess } from "../routerUtils";
+import { assertTableAccess, normalizeCells } from "../routerUtils";
 import { enqueueTableMutation } from "~/server/queue/tableQueue";
 
 function groupByTable<T extends { tableId: string }>(items: T[]) {
@@ -17,6 +17,18 @@ function groupByTable<T extends { tableId: string }>(items: T[]) {
 }
 
 export const cellRouter = createTRPCRouter({
+  getCells: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTableAccess(ctx, input.tableId);
+
+      const cells = await ctx.db.cell.findMany({
+        where: { tableId: input.tableId },
+      });
+
+      return { cells: normalizeCells(cells) };
+    }),
+
   updateCells: protectedProcedure
     .input(
       z.array(
@@ -47,6 +59,7 @@ export const cellRouter = createTRPCRouter({
           changes: updates.map(u => ({
             rowId: u.rowId,
             columnId: u.columnId,
+            tableId: tableId,
             value: u.value,
           })),
         });

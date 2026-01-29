@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { normalizeCells, assertTableAccess } from "../routerUtils";
+import { assertTableAccess } from "../routerUtils";
 import { enqueueTableMutation } from "~/server/queue/tableQueue";
 
 export const rowRouter = createTRPCRouter({
@@ -14,21 +14,6 @@ export const rowRouter = createTRPCRouter({
         orderBy: { order: "asc" },
       });
       return { rows };
-    }),
-
-  getRowsWithCells: protectedProcedure
-    .input(z.object({ tableId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      await assertTableAccess(ctx, input.tableId);
-
-      const rows = await ctx.db.row.findMany({
-        where: { tableId: input.tableId },
-        orderBy: { order: "asc" },
-      });
-      const cells = await ctx.db.cell.findMany({
-        where: { rowId: { in: rows.map((r) => r.id) } },
-      });
-      return { rows, cells: normalizeCells(cells) };
     }),
 
   addRow: protectedProcedure
