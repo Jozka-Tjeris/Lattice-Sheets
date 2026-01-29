@@ -74,16 +74,19 @@ async function main() {
         {
           rowId: row.id,
           columnId: nameColumn.id,
+          tableId: table.id,
           value: faker.person.fullName(),
         },
         {
           rowId: row.id,
           columnId: emailColumn.id,
+          tableId: table.id,
           value: faker.internet.email(),
         },
         {
           rowId: row.id,
           columnId: ageColumn.id,
+          tableId: table.id,
           value: faker.number.int({ min: 18, max: 80 }).toString(),
         },
       ],

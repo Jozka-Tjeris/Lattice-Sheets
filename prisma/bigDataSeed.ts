@@ -66,13 +66,13 @@ async function main() {
 
   // 6. Generate cell data in batches
   const CELL_CHUNK = 2000;
-  const cellsData: { rowId: string; columnId: string; value: string }[] = [];
+  const cellsData: { rowId: string; columnId: string; tableId: string; value: string }[] = [];
 
   for (const rowId of rowIds) {
     cellsData.push(
-      { rowId, columnId: nameColumn.id, value: faker.person.fullName() },
-      { rowId, columnId: emailColumn.id, value: faker.internet.email() },
-      { rowId, columnId: ageColumn.id, value: faker.number.int({ min: 18, max: 80 }).toString() }
+      { rowId, columnId: nameColumn.id, tableId: table.id, value: faker.person.fullName() },
+      { rowId, columnId: emailColumn.id, tableId: table.id, value: faker.internet.email() },
+      { rowId, columnId: ageColumn.id, tableId: table.id, value: faker.number.int({ min: 18, max: 80 }).toString() }
     );
   }
 
