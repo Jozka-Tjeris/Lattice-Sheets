@@ -13,7 +13,7 @@ import type {
 } from "./tableTypes";
 import { TableCell } from "../TableCell";
 import { useTableLayout } from "./useTableLayout";
-import { useTableInteractions } from "./useTableInteractions";
+import { useTableInteractions, type PendingCellUpdate } from "./useTableInteractions";
 import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 import { useTableViews } from "./useTableViews";
@@ -199,23 +199,49 @@ export function TableProvider({
     []
   );
 
+  // Used to prevent re-initialization after initial load has finished
+  const hasInitializedRows = useRef(false);
+  const hasInitializedCols = useRef(false);
+  const hasInitializedCells = useRef(false);
+
+  // Resets when tableId changes
   useEffect(() => {
-    if (initialRows.length > 0) {
-      setRows(initialRows.map((r) => ({ ...r, internalId: r.internalId ?? r.id })));
-    }
-  }, [initialRows]);
+    hasInitializedRows.current = false;
+    hasInitializedCols.current = false;
+    hasInitializedCells.current = false;
+  }, [tableId]);
 
   useEffect(() => {
-    if (initialColumns.length > 0) {
-      setColumns(initialColumns.map((c) => ({ ...c, internalId: c.id, columnType: c.columnType })));
+    // Only sync if not initialized yet or if the local state is currently empty
+    const shouldSync = !hasInitializedRows.current || rows.length === 0;
+    console.log(shouldSync, "HII")
+    if (initialRows.length > 0 && shouldSync) {
+      setRows(initialRows.map((r) => (
+        { ...r, internalId: r.internalId ?? r.id, optimistic: false }
+      )));
+      hasInitializedRows.current = true;
     }
-  }, [initialColumns]);
+  }, [initialRows, tableId]); // tableId ensures fresh start on navigation
 
   useEffect(() => {
-    if (Object.keys(initialCells).length > 0) {
+    const shouldSync = !hasInitializedCols.current || columns.length === 0;
+
+    if (initialColumns.length > 0 && shouldSync) {
+      setColumns(initialColumns.map((c) => (
+        { ...c, internalId: c.id, columnType: c.columnType, optimistic: false }
+      )));
+      hasInitializedCols.current = true;
+    }
+  }, [initialColumns, tableId]);
+
+  useEffect(() => {
+    const shouldSync = !hasInitializedCells.current || Object.keys(cells).length === 0;
+
+    if (Object.keys(initialCells).length > 0 && shouldSync) {
       setCells(initialCells);
+      hasInitializedCells.current = true;
     }
-  }, [initialCells]);
+  }, [initialCells, tableId]);
 
   const { ROW_HEIGHT, DEFAULT_COL_WIDTH, MIN_COL_WIDTH, MAX_COL_WIDTH, headerHeight, columnSizing, 
     setHeaderHeight, startVerticalResize, setColumnSizing 
@@ -223,7 +249,7 @@ export function TableProvider({
 
   const { activeCell, pendingCellUpdatesRef, cellRefs, updateCellsMutation,
     setActiveCell, registerRef, updateCell, isNumericalValue,
-  } = useTableInteractions(null, tableId, rowsRef, columnsRef, setCells);
+  } = useTableInteractions(null, tableId, rowsRef, columnsRef, cells, setCells);
 
   const isOptimisticColumnId = (id: string) =>
   id.startsWith("optimistic-col-");
@@ -455,8 +481,9 @@ export function TableProvider({
 
   const { handleAddRow, handleDeleteRow, 
     handleAddColumn, handleDeleteColumn, handleRenameColumn, 
-    getIsStructureStable, structureMutationInFlightRef 
-  } = useTableStructure(tableId, rows, columns, setRows, setColumns, columnsRef, isViewDirty, onStructureCommitted);
+    getIsStructureStable, structureMutationInFlightRef,
+    optimisticRowIdMapRef, optimisticColIdMapRef,
+  } = useTableStructure(tableId, rows, columns, setRows, setColumns, isViewDirty, onStructureCommitted);
 
   //Perform initial cache loading
   useEffect(() => {
@@ -469,20 +496,55 @@ export function TableProvider({
     hasHydratedRef.current = true;
   }, [columns, load, cached, getIsStructureStable]);
 
-    //Flush cell updates after preset interval duration
+  const flushPendingCellUpdates = useCallback(() => {
+    if (pendingCellUpdatesRef.current.length === 0) return;
+    if (!getIsStructureStable()) return; // skip flush while structure is in flight
+
+    const stillPending: PendingCellUpdate[] = [];
+    const updatesToSend = pendingCellUpdatesRef.current
+      .map(update => {
+        // Split the key into rowId and columnId
+        const rowId = update.rowId;
+        const colId = update.columnId;
+
+        const mappedRowId = optimisticRowIdMapRef.current[rowId] ?? rowId;
+        const mappedColId = optimisticColIdMapRef.current[colId] ?? colId;
+
+        // Skip updates for rows or columns that are still unresolved
+        if ((rowId.startsWith("optimistic-row-") && !optimisticRowIdMapRef.current[rowId]) ||
+            (colId.startsWith("optimistic-col-") && !optimisticColIdMapRef.current[colId])) {
+          stillPending.push(update);
+          return null;
+        }
+
+        return {
+          ...update,
+          rowId: mappedRowId,
+          columnId: mappedColId,
+        };
+      })
+      .filter((u) => u !== null);
+
+    if (updatesToSend.length === 0) return;
+    // Re-add pending updates back
+    pendingCellUpdatesRef.current = stillPending;
+
+    updateCellsMutation.mutate(updatesToSend);
+  }, [getIsStructureStable, optimisticColIdMapRef, optimisticRowIdMapRef, pendingCellUpdatesRef, updateCellsMutation]);
+
+  //Flush cell updates after preset interval duration
   useEffect(() => {
     const interval = setInterval(() => {
-      if (structureMutationInFlightRef.current > 0) return;
-      if (pendingCellUpdatesRef.current.length === 0) return;
+      flushPendingCellUpdates();
+    }, 300);
 
-      const updatesToSend = [...pendingCellUpdatesRef.current];
-      pendingCellUpdatesRef.current = [];
-
-      updateCellsMutation.mutate(updatesToSend);
-    }, 300); // every 300ms, adjust as needed
-
-    return () => clearInterval(interval);
-  }, [updateCellsMutation, pendingCellUpdatesRef, structureMutationInFlightRef]);
+    // Cleanup runs once when the component unmounts
+    return () => {
+      clearInterval(interval);
+      flushPendingCellUpdates(); // run exactly once
+    };
+    // Only include stable deps here
+  }, [flushPendingCellUpdates]); 
 
   const structureValue = useMemo(
     () => ({
