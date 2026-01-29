@@ -4,6 +4,18 @@ import { normalizeCells, assertTableAccess } from "../routerUtils";
 import { enqueueTableMutation } from "~/server/queue/tableQueue";
 
 export const rowRouter = createTRPCRouter({
+  getRows: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTableAccess(ctx, input.tableId);
+
+      const rows = await ctx.db.row.findMany({
+        where: { tableId: input.tableId },
+        orderBy: { order: "asc" },
+      });
+      return { rows };
+    }),
+
   getRowsWithCells: protectedProcedure
     .input(z.object({ tableId: z.string() }))
     .query(async ({ ctx, input }) => {

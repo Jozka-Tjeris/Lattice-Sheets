@@ -65,15 +65,34 @@ export function useTableStructure(
       }
       if(!confirmStructuralChange("Do you want to add a row?")) return;
       const optimisticId = `optimistic-row-${crypto.randomUUID()}`;
-      setRows((prev) => [
+      const newRowLocal: TableRow = {
+        id: optimisticId,
+        internalId: optimisticId,
+        order: orderNum,
+        optimistic: true,
+      };
+      setRows((prev) => [...prev, newRowLocal]);
+
+      const newRowCache = {
+        id: newRowLocal.id,
+        tableId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        order: newRowLocal.order,
+      };
+      // Optimistic update for cache
+      utils.row.getRows.setData({ tableId }, prev =>({
         ...prev,
-        {
-          id: optimisticId,
-          internalId: optimisticId,
-          order: orderNum,
-          optimistic: true,
-        },
-      ]);
+        rows: prev ? [...prev.rows, newRowCache] : [newRowCache]
+      }));
+
+      utils.row.getRowsWithCells.setData({ tableId }, prev => {
+        if (!prev) return { rows: [newRowCache], cells: {} };
+        return {
+          ...prev,
+          rows: [...prev.rows, newRowCache],
+        }
+      });
 
       beginStructureMutation();
       try {
@@ -91,15 +110,52 @@ export function useTableStructure(
               : r
           )
         );
+
+        const realRow = {
+          id: result.id,
+          tableId,
+          createdAt: new Date(result.createdAt),
+          updatedAt: new Date(result.updatedAt),
+          order: orderNum,
+        };
+        // Set real ID to row in cache
+        utils.row.getRows.setData({ tableId }, prev => {
+          return {
+            ...prev,
+            rows: prev ? prev.rows.map(r => (r.id === optimisticId ? realRow : r)) : [realRow],
+          };
+        });
+
+        utils.row.getRowsWithCells.setData({ tableId }, prev => {
+          if (!prev) return { rows: [realRow], cells: {} };
+          return {
+            ...prev,
+            rows: prev.rows.map(r => (r.id === optimisticId ? realRow : r)),
+          };
+        });
       } catch {
         // Filter out row with optimistic id
         setRows((prev) => prev.filter((r) => r.id !== optimisticId));
+
+        // Rollback caches
+        utils.row.getRows.setData({ tableId }, prev => {
+          if (!prev) return prev;
+          return { ...prev, rows: prev.rows.filter(r => r.id !== optimisticId) };
+        });
+
+        utils.row.getRowsWithCells.setData({ tableId }, prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            rows: prev.rows.filter(r => r.id !== optimisticId),
+          };
+        });
       } finally {
         endStructureMutation();
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, columnsRef, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation]
+    [tableId, setRows, columns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation, utils]
   );
 
   const handleAddColumn = useCallback(
@@ -205,7 +261,7 @@ export function useTableStructure(
 
   const handleDeleteRow = useCallback(
     async (rowId: string, rowPosition: number) => {
-      if (!userId) return; // not logged in
+      if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before deleting any rows");
         return;
@@ -213,7 +269,29 @@ export function useTableStructure(
       if(!confirmStructuralChange(`Delete row "${rowPosition}"?\n\nThis will remove all its cell values.`)) return;
       // Optimistic removal
       const prevRows = [...rows ?? []]; // capture current state for rollback
+      const prevRowsCache = utils.row.getRowsWithCells.getData({ tableId });
+      const prevRowsWithCells = utils.row.getRowsWithCells.getData({ tableId });
       setRows((prev) => prev.filter((r) => r.id !== rowId && r.internalId !== rowId));
+
+      // Optimistic removal from getRows cache
+      utils.row.getRows.setData({ tableId }, prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          rows: prev.rows.filter(r => r.id !== rowId),
+        };
+      });
+      // Optimistic removal from getRowsWithCells cache
+      utils.row.getRowsWithCells.setData({ tableId }, prev => {
+        if (!prev) return prev;
+        const newCells = { ...prev.cells };
+        delete newCells[rowId]; // remove all cells for this row
+        return {
+          ...prev,
+          rows: prev.rows.filter(r => r.id !== rowId),
+          cells: newCells,
+        };
+      });
 
       beginStructureMutation();
       try {
@@ -224,12 +302,17 @@ export function useTableStructure(
       } catch {
         // Revert on failure
         setRows(prevRows);
+        // Rollback caches
+        utils.row.getRows.setData({ tableId }, prevRowsCache);
+        if (prevRowsWithCells) {
+          utils.row.getRowsWithCells.setData({ tableId }, prevRowsWithCells);
+        }
       } finally {
         endStructureMutation();
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, isViewDirty, confirmStructuralChange, maybeCommitStructure, rows, userId, deleteRowMutation]
+    [tableId, setRows, isViewDirty, confirmStructuralChange, maybeCommitStructure, rows, userId, deleteRowMutation, utils]
   );
 
   const handleDeleteColumn = useCallback(
@@ -282,7 +365,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, deleteColumnMutation]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, deleteColumnMutation, utils]
   );
 
   const handleRenameColumn = useCallback(
@@ -349,7 +432,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, renameColumnMutation]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, renameColumnMutation, utils]
   );
 
   return {
