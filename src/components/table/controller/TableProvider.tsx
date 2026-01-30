@@ -274,19 +274,6 @@ export function TableProvider({
     }
   }, [cached]);
 
-  // Focus effect
-  useEffect(() => {
-    if (!activeCell) return;
-    const el = cellRefs.current[`${activeCell.rowId}:${activeCell.columnId}`];
-    if (
-      el &&
-      document.activeElement?.tagName !== "INPUT" &&
-      document.activeElement !== el
-    ) {
-      el.focus();
-    }
-  }, [activeCell, cellRefs]);
-
   // STABLE DATA: We return original row references
   const tableData = useMemo(() => {
     const sorted = [...rows].sort((a, b) => a.order - b.order);
@@ -463,6 +450,19 @@ export function TableProvider({
     columnPinning,
     globalSearch,
   }), [sorting, columnFilters, columnVisibility, columnSizing, columnPinning, globalSearch]);
+
+  // Focus effect (also update based on view config state)
+  useEffect(() => {
+    if (!activeCell) return;
+    const el = cellRefs.current[`${activeCell.rowId}:${activeCell.columnId}`];
+    if (
+      el &&
+      document.activeElement?.tagName !== "INPUT" &&
+      document.activeElement !== el
+    ) {
+      el.focus();
+    }
+  }, [activeCell, cellRefs, stableTableState]);
 
   const { activeViewId, setActiveViewId,
     activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
