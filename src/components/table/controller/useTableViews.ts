@@ -9,6 +9,7 @@ import { ViewConfigSchema, type ViewConfig } from "~/server/api/viewsConfigTypes
 import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, SortingState, VisibilityState } from "@tanstack/react-table";
 import type { Column } from "./tableTypes";
 import { INDEX_COL_ID } from "./TableProvider";
+import type { JsonValue } from "@prisma/client/runtime/client";
 
 type TableViewStateInput = {
   sorting: SortingState;
@@ -79,6 +80,8 @@ export function useTableViews(
 ) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
+
+  const utils = trpc.useUtils();
 
   const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
 
@@ -191,7 +194,23 @@ export function useTableViews(
       isDefault: false,
     };
 
+    const optimisticViewCache = {
+      id: optimisticId,
+      name: suggestedName,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      tableId,
+      config: parsedConfig.data,
+      isDefault: false
+    }
+
     setViews((prev) => prev.filter((v) => v.tableId === tableId).concat(optimisticView));
+
+    // Perform optimistic update in cache
+    utils.views.getViews.setData({ tableId }, (prev): typeof prev =>
+        prev ? [...prev, optimisticViewCache] : [optimisticViewCache]
+    );
+
     setActiveViewId(optimisticId);
     activeViewIdRef.current = optimisticId;
     setActiveViewConfig(normalizedConfig);
@@ -204,6 +223,11 @@ export function useTableViews(
         isDefault: false,
         optimisticId,
       });
+      // Reconcile IDs in cache regardless if stale or not
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, (prev): typeof prev =>
+          prev ? prev.map(v => v.id === optimisticId ? result : v) : prev
+      );
+      // Only update UI if not stale
       if (isStale() || tableId !== tableIdAtCallTime) return;
       setViews((prev) =>
         prev.map((v) => (v.id === optimisticId ? { ...v, id: result.id, optimistic: false } : v))
@@ -211,6 +235,11 @@ export function useTableViews(
       setActiveViewId(result.id);
       activeViewIdRef.current = result.id;
     } catch {
+      // Rollback cache regardless if stale or not
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, (prev): typeof prev =>
+          prev ? prev.filter(v => v.id !== optimisticId) : []
+      );
+      // Only update UI if not stale
       if (isStale() || tableId !== tableIdAtCallTime) return;
       setViews((prev) => prev.filter((v) => v.id !== optimisticId));
       if (activeViewIdRef.current === optimisticId) {
@@ -219,7 +248,7 @@ export function useTableViews(
         setActiveViewConfig(null);
       }
     }
-  }, [userId, parsedConfig, tableId, views, createViewMutation, confirmStructuralChange, isStale]);
+  }, [userId, parsedConfig, tableId, views, createViewMutation, confirmStructuralChange, isStale, utils.views.getViews]);
 
   const handleUpdateView = useCallback(async () => {
     if (!userId || !activeViewIdRef.current || !parsedConfig.success) return;
@@ -228,10 +257,19 @@ export function useTableViews(
     const oldView = views.find((v) => v.id === activeViewIdRef.current);
     if (!oldView) return;
 
+    const prevCache = utils.views.getViews.getData({ tableId });
+
     const normalizedConfig = normalizeViewConfig(parsedConfig.data);
     setViews((prev) =>
       prev.map((v) => (v.id === activeViewIdRef.current ? { ...v, config: normalizedConfig } : v))
     );
+
+    // Optimistic update for cache
+    utils.views.getViews.setData({ tableId }, (prev): typeof prev =>
+      prev ? prev.map(v => v.id === activeViewIdRef.current ? { ...v, config: parsedConfig.data } : v)
+        : prev
+    );
+
     setActiveViewConfig(normalizedConfig);
 
     try {
@@ -242,11 +280,13 @@ export function useTableViews(
       });
       if (isStale() || tableId !== tableIdAtCallTime) return;
     } catch {
+      // Always restore cache
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, () => prevCache);
       if (isStale() || tableId !== tableIdAtCallTime) return;
       setViews((prev) => prev.map((v) => (v.id === activeViewIdRef.current ? oldView : v)));
       setActiveViewConfig(oldView.config);
     }
-  }, [userId, parsedConfig, views, tableId, updateViewMutation, isStale]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation, isStale, utils.views.getViews]);
 
   const handleSetDefaultView = useCallback(async (viewId: string) => {
     if (!userId || !viewId || !parsedConfig.success) return;
@@ -254,13 +294,23 @@ export function useTableViews(
 
     const oldView = views.find((v) => v.id === viewId);
     if (!oldView) return;
-    const prevDefaultView = views.find((v) => v.isDefault);
+    const prevDefaultView = views.find((v) => v.isDefault)!;
 
-    setViews((prev) =>
-      prev.map((v) =>
-        v.id === viewId ? { ...v, isDefault: true } : { ...v, isDefault: false }
-      )
+    setViews((prev) => prev.map((v) => ({ ...v, isDefault: v.id === viewId })));
+
+    // snapshot cache state
+    const prevCache = utils.views.getViews.getData({ tableId });
+
+    // Optimistic update for cache
+    utils.views.getViews.setData({ tableId }, (prev): typeof prev =>
+      prev
+        ? prev.map(v => ({
+            ...v,
+            isDefault: v.id === viewId,
+          }))
+        : prev
     );
+
     applyView(oldView);
 
     try {
@@ -270,9 +320,17 @@ export function useTableViews(
         config: parsedConfig.data,
         isDefault: true
       });
+      // Update cache regardless if stale or not
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, (prev) =>
+        prev
+          ? prev.map(v => ({ ...v, isDefault: v.id === viewId }))
+          : prev
+      );
       if (isStale() || tableId !== tableIdAtCallTime) return;
       activeViewIdRef.current = viewId;
     } catch {
+      // Rollback cache regardless if stale or not
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, () => prevCache);
       if (isStale() || tableId !== tableIdAtCallTime) return;
       setViews((prev) =>
         prev.map((v) =>
@@ -284,7 +342,7 @@ export function useTableViews(
         )
       );
     }
-  }, [userId, parsedConfig, views, tableId, updateViewMutation, applyView, isStale]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation, applyView, isStale, utils.views.getViews]);
 
   const handleDeleteView = useCallback(async (viewId: string) => {
     if (!userId) return;
@@ -305,7 +363,14 @@ export function useTableViews(
     const nextView =
       views.find((v) => v.isDefault && v.tableId === tableId) ?? views.find((v) => v.id !== viewId)!;
 
+    const prevCache = utils.views.getViews.getData({ tableId });
+
     setViews((prev) => prev.filter((v) => v.id !== viewId));
+
+    utils.views.getViews.setData({ tableId }, (prev): typeof prev =>
+      prev ? prev.filter(v => v.id !== viewId) : prev
+    );
+
     if (activeViewIdRef.current === viewId) {
       applyView(nextView);
     }
@@ -314,10 +379,12 @@ export function useTableViews(
       await deleteViewMutation.mutateAsync({ tableId, viewId });
       if (isStale() || tableId !== tableIdAtCallTime) return;
     } catch {
+      // Rollback cache regardless if stale or not
+      utils.views.getViews.setData({ tableId: tableIdAtCallTime }, () => prevCache);
       if (isStale() || tableId !== tableIdAtCallTime) return;
       setViews((prev) => [...prev, viewToDelete]);
     }
-  },[userId, views, confirmStructuralChange, tableId, deleteViewMutation, applyView, isStale]);
+  },[userId, views, confirmStructuralChange, tableId, deleteViewMutation, applyView, isStale, utils.views.getViews]);
 
   const resetViewConfig = useCallback(() => {
     setters.setSorting([]);
@@ -327,7 +394,7 @@ export function useTableViews(
     setters.setColumnPinning({ left: [INDEX_COL_ID], right: [] });
     setters.setGlobalSearch("");
     setActiveCell(null);
-  }, [setters, setActiveCell, INDEX_COL_ID]);
+  }, [setters, setActiveCell]);
 
   /* ---------------- Default View Setup ---------------- */
   useEffect(() => {
@@ -352,6 +419,7 @@ export function useTableViews(
   /* ------------------- onStructureCommitted ------------------- */
   const onStructureCommitted = useCallback(() => {
     if (!userId || !activeViewIdRef.current) return;
+    const tableIdAtCallTime = tableId;
 
     const normalized = normalizeState(
       currentConfig,
@@ -365,6 +433,16 @@ export function useTableViews(
       )
     );
 
+    utils.views.getViews.setData({ tableId: tableIdAtCallTime }, (prev) =>
+      prev
+        ? prev.map(v =>
+            v.id === activeViewIdRef.current
+              ? { ...v, config: toViewConfigInput(normalized) as JsonValue }
+              : v
+          )
+        : prev
+    );
+
     setActiveViewConfig(normalized);
     setCached(normalized);
     void save(normalized);
@@ -374,7 +452,7 @@ export function useTableViews(
       viewId: activeViewIdRef.current,
       config: toViewConfigInput(normalized),
     });
-  }, [activeViewIdRef, currentConfig, columns, INDEX_COL_ID, save, setCached, userId, tableId, updateViewMutation]);
+  }, [activeViewIdRef, currentConfig, columns, save, setCached, userId, tableId, updateViewMutation, utils.views.getViews]);
 
   return {
     activeViewId,

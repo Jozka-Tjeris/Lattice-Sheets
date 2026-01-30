@@ -211,7 +211,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             creatingTable={creatingTable}
             onDeleteTable={handleDeleteTable}
           />
-          <GridViewBar />
+          <GridViewBar tableId={activeTableId ?? ""} />
           <div className="flex min-h-0 min-w-0 flex-1 flex-row">
             <ViewSelectorBar tableId={activeTableId ?? ""}/>
             <main className="min-h-0 min-w-0 flex-1">

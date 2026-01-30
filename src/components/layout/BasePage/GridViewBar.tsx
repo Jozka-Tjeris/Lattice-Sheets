@@ -5,7 +5,11 @@ import {
   useTableViewController,
 } from "~/components/table/controller/TableProvider";
 
-export function GridViewBar() {
+interface GridViewBarProps {
+  tableId: string;
+}
+
+export function GridViewBar({ tableId }: GridViewBarProps) {
   /* ----------------------- Structure state ----------------------- */
   const {
     globalSearch,
@@ -27,7 +31,7 @@ export function GridViewBar() {
   const handleSelectView = (viewId: string) => {
     const view = views.find((v) => v.id === viewId);
     if (!view) return;
-    applyView({ id: view.id, config: view.config });
+    applyView({ id: view.id, tableId, config: view.config });
   };
 
   const handleClearView = () => {
