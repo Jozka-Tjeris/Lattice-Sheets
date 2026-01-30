@@ -1,20 +1,24 @@
 "use client";
 
 import { useTableViewController } from "~/components/table/controller/TableProvider";
-import type { CachedTableState } from "~/components/table/controller/useTableStateCache";
 
-export function ViewSelectorBar() {
+interface ViewSelectorBarProps{
+  tableId: string;
+}
+
+export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
   const {
     activeViewId,
     isViewDirty,
     isConfigValid,
     views,
     applyView,
-    persistAppliedView,
     handleCreateView,
     handleUpdateView,
     handleSetDefaultView,
-    handleDeleteView,} = useTableViewController();
+    handleDeleteView,
+    // hasDefaultView,
+  } = useTableViewController();
 
   /* ------------------------------ Render ------------------------------ */
   return (
@@ -34,8 +38,7 @@ export function ViewSelectorBar() {
             <button
               className="flex min-w-0 flex-1 items-center gap-1 text-left"
               onClick={() => {
-                applyView({ id: view.id, config: view.config });
-                persistAppliedView(view.config as unknown as CachedTableState);
+                applyView({ id: view.id, tableId, config: view.config });
               }}
             >
               {view.isDefault && (
@@ -96,8 +99,7 @@ export function ViewSelectorBar() {
               (v) => v.id === activeViewId
             );
             if (view){
-              applyView({ id: view.id, config: view.config });
-              persistAppliedView(view.config as unknown as CachedTableState);
+              applyView({ id: view.id, tableId, config: view.config });
             }
           }}
         >

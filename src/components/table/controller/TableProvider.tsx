@@ -65,8 +65,7 @@ export type TableViewState = {
   isViewDirty: boolean;
   isConfigValid: boolean;
   views: { id: string; name: string; config: CachedTableState; isDefault: boolean; }[];
-  applyView: (view: { id: string; config: unknown; }) => void;
-  persistAppliedView: (config: CachedTableState) => void;
+  applyView: (view: { id: string; tableId: string; config: unknown; }) => void;
   resetViewConfig: () => void;
   handleCreateView: () => void;
   handleUpdateView: () => void;
@@ -447,35 +446,38 @@ export function TableProvider({
     [pinnedLeftMeta, lastPinnedLeftId]
   );
 
+  const stableTableStateSetters = useMemo(() => ({
+    setSorting,
+    setColumnFilters,
+    setColumnVisibility,
+    setColumnSizing,
+    setColumnPinning,
+    setGlobalSearch,
+  }), [setSorting, setColumnFilters, setColumnVisibility, setColumnSizing, setColumnPinning, setGlobalSearch]);
+
+  const stableTableState = useMemo(() => ({
+    sorting,
+    columnFilters,
+    columnVisibility,
+    columnSizing,
+    columnPinning,
+    globalSearch,
+  }), [sorting, columnFilters, columnVisibility, columnSizing, columnPinning, globalSearch]);
+
   const { activeViewId, setActiveViewId,
     activeViewConfig, setActiveViewConfig, currentConfig, resetViewConfig,
     isViewDirty, isConfigValid,
-    views, applyView, persistAppliedView,
+    views, applyView,
     handleCreateView, handleUpdateView, handleDeleteView, handleSetDefaultView,
     onStructureCommitted,
   } = useTableViews(
     tableId,
-    {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      columnSizing,
-      columnPinning,
-      globalSearch,
-    },
-    {
-      setSorting,
-      setColumnFilters,
-      setColumnVisibility,
-      setColumnSizing,
-      setColumnPinning,
-      setGlobalSearch,
-    },
+    stableTableState,
+    stableTableStateSetters,
     setActiveCell,
     setCached,
     save,
     columns,
-    INDEX_COL_ID,
   );
 
   const { handleAddRow, handleDeleteRow, 
@@ -632,7 +634,6 @@ export function TableProvider({
       isConfigValid,
       views,
       applyView,
-      persistAppliedView,
       resetViewConfig,
       handleCreateView,
       handleUpdateView,
@@ -649,7 +650,6 @@ export function TableProvider({
       isConfigValid,
       views,
       applyView,
-      persistAppliedView,
       resetViewConfig,
       handleCreateView,
       handleUpdateView,

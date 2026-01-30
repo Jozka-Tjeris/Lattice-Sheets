@@ -8,6 +8,7 @@ import { normalizeState, type CachedTableState } from "./useTableStateCache";
 import { ViewConfigSchema, type ViewConfig } from "~/server/api/viewsConfigTypes";
 import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, SortingState, VisibilityState } from "@tanstack/react-table";
 import type { Column } from "./tableTypes";
+import { INDEX_COL_ID } from "./TableProvider";
 
 type TableViewStateInput = {
   sorting: SortingState;
@@ -43,7 +44,7 @@ function toViewConfigInput(
     columnVisibility: state.columnVisibility,
     columnSizing: state.columnSizing,
     columnPinning: {
-      left: state.columnPinning.left ?? [],
+      left: state.columnPinning.left ?? [INDEX_COL_ID],
       right: state.columnPinning.right ?? [],
     },
     globalSearch: state.globalSearch,
@@ -53,16 +54,14 @@ function toViewConfigInput(
 function normalizeViewConfig(config: ViewConfig): CachedTableState {
   return {
     sorting: config.sorting ?? [],
-    // Map through filters to ensure the 'value' is treated as a string
-    columnFilters: (config.columnFilters ?? []).map(filter => ({
+    columnFilters: (config.columnFilters ?? []).map((filter) => ({
       id: filter.id,
-      // Force it to a string, or provide a fallback
-      value: String(filter.value ?? ""), 
+      value: String(filter.value ?? ""),
     })),
     columnVisibility: config.columnVisibility ?? {},
     columnSizing: config.columnSizing ?? {},
     columnPinning: {
-      left: config.columnPinning?.left ?? [],
+      left: config.columnPinning?.left ?? [INDEX_COL_ID],
       right: config.columnPinning?.right ?? [],
     },
     globalSearch: config.globalSearch ?? "",
@@ -77,30 +76,29 @@ export function useTableViews(
   setCached: (value: React.SetStateAction<CachedTableState | null>) => void,
   save: (state: CachedTableState) => void,
   columns: Column[],
-  INDEX_COL_ID: string,
 ) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
 
   const isValidTableId = !!tableId && !tableId.includes("optimistic-table");
-  const didInitDefaultViewRef = useRef(false);
+
+  const tableScopeRef = useRef<{ tableId: string } | null>(null);
+  const activeViewIdRef = useRef<string | null>(null);
+
+  const isStale = useCallback(() => tableScopeRef.current?.tableId !== tableId, [tableId]);
+
+  if (tableScopeRef.current?.tableId !== tableId) {
+    tableScopeRef.current = { tableId };
+  }
 
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [activeViewConfig, setActiveViewConfig] = useState<CachedTableState | null>(null);
-  const [views, setViews] = useState<{ id: string; name: string; config: CachedTableState; optimistic?: boolean, isDefault: boolean }[]>([]);
+  const [views, setViews] = useState<
+    { id: string; name: string; config: CachedTableState; tableId: string; optimistic?: boolean; isDefault: boolean }[]
+  >([]);
 
-  /* ----------------------------- Queries ----------------------------- */
-  const viewsQuery = trpc.views.getViews.useQuery(
-    { tableId },
-    { enabled: isValidTableId }
-  );
+  const viewsQuery = trpc.views.getViews.useQuery({ tableId }, { enabled: isValidTableId });
 
-  const defaultViewQuery = trpc.views.getDefaultView.useQuery(
-    { tableId },
-    { enabled: isValidTableId }
-  );
-
-  /* -------------------------- Current Config -------------------------- */
   const currentConfig = useMemo(
     () => ({
       sorting: state.sorting,
@@ -120,215 +118,206 @@ export function useTableViews(
     ]
   );
 
-  const parsedConfig = useMemo(
-    () => ViewConfigSchema.safeParse(currentConfig),
-    [currentConfig]
-  );
+  const parsedConfig = useMemo(() => ViewConfigSchema.safeParse(currentConfig), [currentConfig]);
 
   const isConfigValid = isValidTableId && parsedConfig.success;
   const isViewDirty = !!activeViewConfig && !isEqual(currentConfig, activeViewConfig);
-  const initDefaultViewConfig = useMemo(() => ({ isDefault: true, viewName: "Default table view" }), []);
 
-  /* ---------------------------- Apply View ---------------------------- */
+  /* ---------------- Apply View ---------------- */
   const applyView = useCallback(
-    (view: { id: string; config: unknown }) => {
-      if (!view?.config) return;
-
+    (view: { id: string; tableId: string; config: unknown }) => {
+      if (!view?.config || view.tableId !== tableId) return;
       const config = normalizeViewConfig(view.config);
       setters.setSorting(config.sorting ?? []);
       setters.setColumnFilters(config.columnFilters ?? []);
       setters.setColumnVisibility(config.columnVisibility ?? {});
       setters.setColumnSizing(config.columnSizing ?? {});
-      setters.setColumnPinning(config.columnPinning ?? { left: [], right: [] });
+      setters.setColumnPinning(config.columnPinning ?? { left: [INDEX_COL_ID], right: [] });
       setters.setGlobalSearch(config.globalSearch ?? "");
 
       setActiveCell(null);
       setActiveViewId(view.id);
+      activeViewIdRef.current = view.id;
       setActiveViewConfig(config);
+      setCached(config);
+      save(config);
     },
-    [setters, setActiveCell]
+    [setters, setActiveCell, tableId, save, setCached]
   );
-
-  const persistAppliedView = useCallback((config: CachedTableState) => {
-    // Update cached table state to persist across page navigation
-    setCached(config);
-    save(config);
-  }, [setCached, save]);
 
   const createViewMutation = trpc.views.createView.useMutation();
   const updateViewMutation = trpc.views.updateView.useMutation();
   const deleteViewMutation = trpc.views.deleteView.useMutation();
 
-  /* -------------------------- Handlers --------------------------- */
   const confirmStructuralChange = useCallback((action: string) => {
     return confirm(
       `${action}\n\nChanges are applied immediately and saved automatically.`
     );
   }, []);
 
-  const handleCreateView = useCallback(async (initConfig?: typeof initDefaultViewConfig) => {
-    if(!userId) return;
-    if(!parsedConfig.success) return;
+  /* ---------------- Handlers ---------------- */
+  const handleCreateView = useCallback(async () => {
+    if (!userId || !parsedConfig.success) return;
+    const tableIdAtCallTime = tableId;
 
-    let suggestedName = "";
-    if(initConfig !== initDefaultViewConfig){
-      if(!confirmStructuralChange("Do you want to create a new view?")) return;
-      const newViewName = prompt("Enter view name:", "New view");
-      if(!newViewName) return;
-      if(newViewName?.trim() === ""){
-        alert("New view name cannot be empty");
-        return;
-      }
-      suggestedName = (() => {
-        const existingNames = new Set(views.map(v => v.name));
-        if (!existingNames.has(newViewName.trim())) return newViewName.trim();
-        let i = 1;
-        let candidate = `${newViewName.trim()} (${i})`;
-        while (existingNames.has(candidate)) { i++; candidate = `${newViewName.trim()} (${i})`; }
-        return candidate;
-      })();
-      if(!suggestedName.trim()) return;
+    if (!confirmStructuralChange("Do you want to create a new view?")) return;
+    const newViewName = prompt("Enter view name (be careful, you can't change the view name later):", "New view");
+    if(!newViewName) return;
+    if (!newViewName.trim()) {
+      alert("New view name cannot be empty");
+      return;
     }
+    const suggestedName = (() => {
+      const existingNames = new Set(views.map((v) => v.name));
+      if (!existingNames.has(newViewName.trim())) return newViewName.trim();
+      let i = 1;
+      let candidate = `${newViewName.trim()} (${i})`;
+      while (existingNames.has(candidate)) {
+        i++;
+        candidate = `${newViewName.trim()} (${i})`;
+      }
+      return candidate;
+    })();
 
-    // Generate suggested name if current name already exists
     const optimisticId = `optimistic-view-${crypto.randomUUID()}`;
     const normalizedConfig = normalizeViewConfig(parsedConfig.data);
 
     const optimisticView = {
       id: optimisticId,
-      name: initConfig?.viewName ?? suggestedName,
+      tableId,
+      name: suggestedName,
       config: normalizedConfig,
       optimistic: true,
-      isDefault: initConfig?.isDefault ?? false,
+      isDefault: false,
     };
 
-    setViews(prev => [...prev, optimisticView]);
+    setViews((prev) => prev.filter((v) => v.tableId === tableId).concat(optimisticView));
     setActiveViewId(optimisticId);
+    activeViewIdRef.current = optimisticId;
     setActiveViewConfig(normalizedConfig);
 
     try {
       const { result } = await createViewMutation.mutateAsync({
         tableId,
-        name: initConfig?.viewName ?? suggestedName,
+        name: suggestedName,
         config: parsedConfig.data,
-        isDefault: initConfig?.isDefault ?? false,
+        isDefault: false,
         optimisticId,
       });
-
-      // Replace optimistic ID with real ID
-      setViews(prev =>
-        prev.map(v =>
-          v.id === optimisticId ? { ...v, id: result.id, optimistic: false } : v
-        )
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      setViews((prev) =>
+        prev.map((v) => (v.id === optimisticId ? { ...v, id: result.id, optimistic: false } : v))
       );
       setActiveViewId(result.id);
+      activeViewIdRef.current = result.id;
     } catch {
-      // Filter out view with optimistic id if fails
-      setViews(prev => prev.filter(v => v.id !== optimisticId));
-      if (activeViewId === optimisticId) {
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      setViews((prev) => prev.filter((v) => v.id !== optimisticId));
+      if (activeViewIdRef.current === optimisticId) {
         setActiveViewId(null);
+        activeViewIdRef.current = null;
         setActiveViewConfig(null);
       }
     }
-  }, [userId, parsedConfig, tableId, views, activeViewId, createViewMutation, confirmStructuralChange, initDefaultViewConfig]);
+  }, [userId, parsedConfig, tableId, views, createViewMutation, confirmStructuralChange, isStale]);
 
   const handleUpdateView = useCallback(async () => {
-    if(!userId) return;
-    if(!activeViewId) return; 
-    if(!parsedConfig.success) return;
+    if (!userId || !activeViewIdRef.current || !parsedConfig.success) return;
+    const tableIdAtCallTime = tableId;
 
-    const oldView = views.find(v => v.id === activeViewId);
+    const oldView = views.find((v) => v.id === activeViewIdRef.current);
     if (!oldView) return;
 
     const normalizedConfig = normalizeViewConfig(parsedConfig.data);
-
-    // Optimistically update local view
-    setViews(prev =>
-      prev.map(v => (v.id === activeViewId ? { ...v, config: normalizedConfig } : v))
+    setViews((prev) =>
+      prev.map((v) => (v.id === activeViewIdRef.current ? { ...v, config: normalizedConfig } : v))
     );
     setActiveViewConfig(normalizedConfig);
 
     try {
       await updateViewMutation.mutateAsync({
         tableId,
-        viewId: activeViewId,
+        viewId: activeViewIdRef.current,
         config: parsedConfig.data,
       });
+      if (isStale() || tableId !== tableIdAtCallTime) return;
     } catch {
-      // revert on error
-      setViews(prev =>
-        prev.map(v => (v.id === activeViewId ? oldView : v))
-      );
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      setViews((prev) => prev.map((v) => (v.id === activeViewIdRef.current ? oldView : v)));
       setActiveViewConfig(oldView.config);
     }
-  }, [userId, activeViewId, parsedConfig, views, tableId, updateViewMutation]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation, isStale]);
 
   const handleSetDefaultView = useCallback(async (viewId: string) => {
-    if(!userId) return;
-    if(!viewId) return; 
-    if(!parsedConfig.success) return;
+    if (!userId || !viewId || !parsedConfig.success) return;
+    const tableIdAtCallTime = tableId;
 
-    const oldView = views.find(v => v.id === viewId);
+    const oldView = views.find((v) => v.id === viewId);
     if (!oldView) return;
-    const prevDefaultView = views.find(v => v.isDefault);
-    // Allow mutation to proceed if no default view is available
+    const prevDefaultView = views.find((v) => v.isDefault);
 
-    // Optimistically update local view
-    setViews(prev =>
-      prev.map(v => (v.id === viewId ? { ...v, isDefault: true } : { ...v, isDefault: false }))
+    setViews((prev) =>
+      prev.map((v) =>
+        v.id === viewId ? { ...v, isDefault: true } : { ...v, isDefault: false }
+      )
     );
     applyView(oldView);
 
     try {
       await updateViewMutation.mutateAsync({
         tableId,
-        viewId: viewId,
+        viewId,
         config: parsedConfig.data,
+        isDefault: true
       });
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      activeViewIdRef.current = viewId;
     } catch {
-      // revert on error
-      setViews(prev =>
-        prev.map(v => (v.id === viewId ? oldView : 
-          (v.id === prevDefaultView?.id ? { ...v, isDefault: true} : { ...v, isDefault: false })))
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      setViews((prev) =>
+        prev.map((v) =>
+          v.id === viewId
+            ? oldView
+            : v.id === prevDefaultView?.id
+            ? { ...v, isDefault: true }
+            : { ...v, isDefault: false }
+        )
       );
     }
-  }, [userId, parsedConfig, views, tableId, updateViewMutation, applyView]);
+  }, [userId, parsedConfig, views, tableId, updateViewMutation, applyView, isStale]);
 
   const handleDeleteView = useCallback(async (viewId: string) => {
     if (!userId) return;
-    const viewToDelete = views.find(v => v.id === viewId);
+    const tableIdAtCallTime = tableId;
+    const viewToDelete = views.find((v) => v.id === viewId);
     if (!viewToDelete) return;
-    if(views.length <= 1){
+    if (views.length <= 1) {
       alert("At least one view must be available");
       return;
     }
-    if(viewToDelete.isDefault){
+    if (viewToDelete.isDefault) {
       alert("The default view cannot be deleted. Please mark the view as non-default before deleting");
       return;
     }
 
     if (!confirmStructuralChange(`Delete view "${viewToDelete.name}"?`)) return;
 
-    // Find default view (guaranteed to exist due to prior checks)
-    const nextView = views.find(v => v.isDefault)!;
+    const nextView =
+      views.find((v) => v.isDefault && v.tableId === tableId) ?? views.find((v) => v.id !== viewId)!;
 
-    // Optimistically remove
-    setViews(prev => prev.filter(v => v.id !== viewId));
-    if (activeViewId === viewId) {
-      // Apply new view if current view is deleted
+    setViews((prev) => prev.filter((v) => v.id !== viewId));
+    if (activeViewIdRef.current === viewId) {
       applyView(nextView);
     }
 
     try {
-      await deleteViewMutation.mutateAsync({
-        tableId,
-        viewId,
-      });
+      await deleteViewMutation.mutateAsync({ tableId, viewId });
+      if (isStale() || tableId !== tableIdAtCallTime) return;
     } catch {
-      // revert
-      setViews(prev => [...prev, viewToDelete]);
+      if (isStale() || tableId !== tableIdAtCallTime) return;
+      setViews((prev) => [...prev, viewToDelete]);
     }
-  }, [userId, views, activeViewId, confirmStructuralChange, tableId, deleteViewMutation, applyView]);
+  },[userId, views, confirmStructuralChange, tableId, deleteViewMutation, applyView, isStale]);
 
   const resetViewConfig = useCallback(() => {
     setters.setSorting([]);
@@ -337,81 +326,32 @@ export function useTableViews(
     setters.setColumnSizing({});
     setters.setColumnPinning({ left: [INDEX_COL_ID], right: [] });
     setters.setGlobalSearch("");
-
     setActiveCell(null);
   }, [setters, setActiveCell, INDEX_COL_ID]);
 
-  /* ------------------------ Default View Setup ------------------------ */
-  const initialConfigRef = useRef<typeof parsedConfig.data | null>(null);
-
+  /* ---------------- Default View Setup ---------------- */
   useEffect(() => {
-    if (!initialConfigRef.current && parsedConfig.success) {
-      initialConfigRef.current = parsedConfig.data;
-    }
-  }, [parsedConfig.success, parsedConfig.data]);
+    if (!userId || !isValidTableId || !viewsQuery.data) return;
+    const tableIdAtCallTime = tableId;
 
-  useEffect(() => {
-    if (!userId) return;
-    if (!isValidTableId) return;
-    if (didInitDefaultViewRef.current) return;
-
-    if (viewsQuery.status !== "success" || defaultViewQuery.status !== "success") return;
-
-    didInitDefaultViewRef.current = true;
-
-    const queryViews = (viewsQuery.data ?? []).map(v => ({
+    
+    if (isStale() || tableId !== tableIdAtCallTime) return;
+    const normalizedViews = viewsQuery.data?.map((v) => ({
       ...v,
+      tableId,
       config: normalizeViewConfig(v.config as ViewConfig),
     }));
-    
-    const defaultView = defaultViewQuery.data 
-      ? { ...defaultViewQuery.data, config: normalizeViewConfig(defaultViewQuery.data.config as ViewConfig) }
-      : null;
-
-    setViews(queryViews);
-
-    // Default exists --> apply it
-    if (defaultView) {
-      applyView(defaultView);
-      persistAppliedView(defaultView.config);
-      return;
+    setViews(normalizedViews);
+    // Only apply default view if there is no activeViewId yet
+    if (!activeViewIdRef.current) {
+      const defaultView = normalizedViews.find((v) => v.isDefault);
+      if (defaultView) applyView(defaultView);
     }
-
-    // No default views exist, pick first view as fallback
-    if (!defaultView && queryViews.length > 0) {
-      const firstView = queryViews[0]!;
-      void handleSetDefaultView(firstView.id);
-      return;
-    }
-
-    // Create a view from current state if none exist
-    if (initialConfigRef.current && !queryViews.length) {
-      void handleCreateView(initDefaultViewConfig);
-    }
-  }, [
-    isValidTableId,
-    viewsQuery.status,
-    viewsQuery.data,
-    defaultViewQuery.status,
-    defaultViewQuery.data,
-    applyView,
-    persistAppliedView,
-    userId,
-    handleSetDefaultView,
-    handleCreateView,
-    tableId,
-    updateViewMutation,
-    initDefaultViewConfig,
-  ]);
-
-  useEffect(() => {
-    didInitDefaultViewRef.current = false;
-  }, [tableId]);
+  }, [isValidTableId, tableId, isStale, userId, viewsQuery.data, applyView]);
 
   /* ------------------- onStructureCommitted ------------------- */
   const onStructureCommitted = useCallback(() => {
-    if (!userId) return;
-    if (!activeViewId) return;
+    if (!userId || !activeViewIdRef.current) return;
 
     const normalized = normalizeState(
       currentConfig,
@@ -419,10 +359,9 @@ export function useTableViews(
       new Set(columns.map(c => c.id).concat(INDEX_COL_ID))
     );
 
-    // Optimistically update local active view
-    setViews(prev =>
-      prev.map(v =>
-        v.id === activeViewId ? { ...v, config: normalized } : v
+    setViews((prev) =>
+      prev.map((v) =>
+        v.id === activeViewIdRef.current ? { ...v, config: normalized } : v
       )
     );
 
@@ -432,24 +371,17 @@ export function useTableViews(
 
     void updateViewMutation.mutateAsync({
       tableId,
-      viewId: activeViewId,
+      viewId: activeViewIdRef.current,
       config: toViewConfigInput(normalized),
     });
-  }, [
-    activeViewId,
-    currentConfig,
-    columns,
-    INDEX_COL_ID,
-    save,
-    setCached,
-    userId,
-    tableId,
-    updateViewMutation,
-  ]);
+  }, [activeViewIdRef, currentConfig, columns, INDEX_COL_ID, save, setCached, userId, tableId, updateViewMutation]);
 
   return {
     activeViewId,
-    setActiveViewId,
+    setActiveViewId: (id: string | null) => {
+      setActiveViewId(id);
+      activeViewIdRef.current = id;
+    },
     activeViewConfig,
     setActiveViewConfig,
     currentConfig,
@@ -457,7 +389,6 @@ export function useTableViews(
     isConfigValid,
     views,
     applyView,
-    persistAppliedView,
     resetViewConfig,
     handleCreateView,
     handleUpdateView,
