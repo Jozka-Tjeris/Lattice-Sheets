@@ -1,5 +1,4 @@
 import { type CellValue } from "~/components/table/controller/tableTypes";
-import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { createTRPCContext } from "~/server/api/trpc";
 
@@ -15,20 +14,6 @@ export function normalizeCells(
     map[key] = cell.value;
   }
   return map;
-}
-
-export async function withTableLock<T>(
-  tx: Prisma.TransactionClient,
-  tableId: string,
-  fn: (tx: Prisma.TransactionClient) => Promise<T>,
-): Promise<T> {
-  await tx.$executeRaw`
-    SELECT 1 FROM "Table"
-    WHERE id = ${tableId}
-    FOR UPDATE
-  `;
-
-  return fn(tx);
 }
 
 // Use this for read-only queries
@@ -49,18 +34,4 @@ export async function assertTableAccess(ctx: Context, tableId: string) {
   }
 
   return table;
-}
-
-// Use this for mutations
-export async function withAuthorizedTableLock<T>(
-  ctx: Context,
-  tableId: string,
-  fn: (tx: Prisma.TransactionClient) => Promise<T>,
-) {
-  // tx here is created automatically by ctx.db.$transaction, same API as ctx.db
-  return ctx.db.$transaction(async (tx) => {
-    // Asserts appropriate table access and locks table upon success
-    await assertTableAccess(ctx, tableId);
-    return withTableLock(tx, tableId, fn);
-  });
 }

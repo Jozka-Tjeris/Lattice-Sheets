@@ -17,7 +17,6 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
     handleUpdateView,
     handleSetDefaultView,
     handleDeleteView,
-    // hasDefaultView,
   } = useTableViewController();
 
   /* ------------------------------ Render ------------------------------ */
