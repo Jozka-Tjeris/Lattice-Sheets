@@ -39,6 +39,13 @@ export const TableCell = memo(function TableCell({
 
   const isActive = activeCell?.rowId === rowId && activeCell?.columnId === columnId;
 
+  const [flash, setFlash] = useState<"copy" | "cut" | "paste" | null>(null);
+
+  const triggerFlash = (type: "copy" | "cut" | "paste") => {
+    setFlash(type);
+    setTimeout(() => setFlash(null), 120);
+  };
+
   // Keep refs in sync
   useEffect(() => { localValueRef.current = localValue; }, [localValue]);
   useEffect(() => { isEditingRef.current = isEditing; }, [isEditing]);
@@ -121,6 +128,43 @@ export const TableCell = memo(function TableCell({
       }
     } else if (isActive) {
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.key)) e.preventDefault();
+
+      // --- Clipboard shortcuts ---
+      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (ctrlKey) {
+        switch (e.key.toLowerCase()) {
+          case "c":
+            e.preventDefault();
+            navigator.clipboard.writeText(String(localValueRef.current ?? ""));
+            triggerFlash("copy");
+            break;
+
+          case "x":
+            e.preventDefault();
+            navigator.clipboard.writeText(String(localValueRef.current ?? ""));
+            onChange(columnType === "number" ? "" : "");
+            triggerFlash("cut");
+            break;
+
+          case "v":
+            e.preventDefault();
+            (async () => {
+              const text = await navigator.clipboard.readText();
+              let newValue: CellValue = text;
+              if (columnType === "number") {
+                const num = Number(text);
+                newValue = isNaN(num) ? "" : num;
+              }
+              onChange(newValue);
+              triggerFlash("paste");
+            })();
+            break;
+        }
+      }
+
+      // --- navigation + editing keys ---
       switch (e.key) {
         case "Enter": setIsEditing(true); break;
         case "Tab": cancel(); 
@@ -178,11 +222,13 @@ export const TableCell = memo(function TableCell({
       ref={containerRef}
       data-cell-id={cellId}
       tabIndex={0}
-      className={`relative flex h-full w-full cursor-text items-center truncate px-2 py-1 transition-colors outline-none hover:bg-gray-100 ${
-        isActive
-          ? "rounded-[1px] outline-3 outline-solid outline-blue-500"
-          : "border border-transparent"
-      } `}
+      className={`relative flex h-full w-full cursor-text items-center truncate px-2 py-1
+        transition-colors outline-none hover:bg-gray-100
+        ${isActive ? "rounded-[1px] outline-3 outline-solid outline-blue-500" : "border border-transparent"}
+        ${flash === "copy" ? "bg-blue-100" : ""}
+        ${flash === "cut" ? "bg-red-100" : ""}
+        ${flash === "paste" ? "bg-green-100" : ""}
+      `}
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}
     >
