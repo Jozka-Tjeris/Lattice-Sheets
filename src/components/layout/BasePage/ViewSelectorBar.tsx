@@ -43,7 +43,7 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
               {view.isDefault && (
                 <span className="text-xs text-blue-500">★</span>
               )}
-              <span className="truncate">{view.name}</span>
+              <span className="truncate" title={view.name}>{view.name}</span>
               {activeViewId === view.id && isViewDirty && (
                 <span className="ml-1 text-xs text-orange-500">
                   Draft

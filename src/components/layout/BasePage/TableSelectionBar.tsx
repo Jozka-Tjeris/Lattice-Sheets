@@ -8,6 +8,7 @@ interface TableSelectionBarProps {
   onDeleteTable: (tableId: string) => void;
   onRenameTable: (tableId: string) => void;
   creatingTable: boolean;
+  loadingTable: boolean;
 }
 
 export function TableSelectionBar({
@@ -18,10 +19,11 @@ export function TableSelectionBar({
   onDeleteTable,
   onRenameTable,
   creatingTable,
+  loadingTable,
 }: TableSelectionBarProps) {
   return (
-    <div className="h-8 shrink-0 border-t border-gray-300 bg-blue-100">
-      <div className="flex h-full items-stretch">
+    <div className="h-8 shrink-0 overflow-x-auto border-t border-gray-300 bg-blue-100 no-scrollbar">
+      <div className="flex h-full flex-1 items-stretch">
         {tables.map((table) => {
           const isActive = table.id === activeTableId;
 
@@ -32,7 +34,7 @@ export function TableSelectionBar({
               onClick={() => onTableSelect(table.id)}
               onDoubleClick={() => onRenameTable(table.id)}
             >
-              <span className="max-w-[120px] truncate">{table.name}</span>
+              <span className="max-w-[120px] truncate" title={table.name}>{table.name}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation(); // prevent selecting tab
@@ -40,6 +42,7 @@ export function TableSelectionBar({
                 }}
                 className="ml-2 text-xs text-black hover:text-red-500"
                 title="Delete table"
+                disabled={creatingTable || loadingTable}
               >
                 ✕
               </button>
@@ -50,8 +53,8 @@ export function TableSelectionBar({
         {/* Add table */}
         <button
           onClick={onCreateTable}
-          disabled={creatingTable}
-          className="flex h-full items-center border-r bg-white px-3 text-sm font-medium hover:bg-gray-100"
+          disabled={creatingTable || loadingTable}
+          className="h-full min-w-24 items-center border-r bg-white pl-2 pr-3 text-sm font-medium hover:bg-gray-100"
         >
           + Add table
         </button>

@@ -189,6 +189,13 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
     columnType: col.columnType as ColumnType,
   })) ?? [];
 
+  const allowCreateTable = tablesQuery.isLoading 
+    // If no active table id, means no tables available
+    // Otherwise load if still optimistic
+    || (activeTableId ? activeTableId.startsWith("optimistic-") : false)
+    // Also disable if any non-table query is still loading
+    || rowsQuery.isLoading || columnsQuery.isLoading || cellsQuery.isLoading;
+
   return (
     <TableProvider
       key={activeTableId} // Remounts provider when table changes
@@ -209,6 +216,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             onCreateTable={handleCreateTable}
             onRenameTable={handleRenameTable}
             creatingTable={creatingTable}
+            loadingTable={allowCreateTable}
             onDeleteTable={handleDeleteTable}
           />
           <GridViewBar tableId={activeTableId ?? ""} />
@@ -217,10 +225,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             <main className="min-h-0 min-w-0 flex-1">
               <ContentRetriever
                 hasTables={hasTables}
-                tablesLoading={tablesQuery.isLoading 
-                  // If no active table id, means no tables available
-                  // Otherwise load if still optimistic
-                  || (activeTableId ? activeTableId.startsWith("optimistic-") : false)}
+                tablesLoading={allowCreateTable}
                 tablesError={tablesQuery.error?.message}
                 rowsLoading={rowsQuery.isLoading}
                 columnsLoading={columnsQuery.isLoading}
