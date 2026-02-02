@@ -50,7 +50,7 @@ export function BaseIcon({
           </a>
           
           {/* Actions Container */}
-          <div className="flex shrink-0 items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex shrink-0 items-center space-x-1 opacity-100 transition-opacity">
             <button
               className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
               onClick={() => handleRenameBase(baseId, name)}

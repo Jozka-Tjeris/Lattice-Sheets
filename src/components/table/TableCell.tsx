@@ -112,7 +112,7 @@ export const TableCell = memo(function TableCell({
 
   // Key handling
   const moveActiveCell = useMoveActiveCell();
-  const handleKeyDown = (
+  const handleKeyDown = async (
     e: React.KeyboardEvent<HTMLDivElement | HTMLInputElement>
   ) => {
     if (isEditing) {
@@ -130,27 +130,27 @@ export const TableCell = memo(function TableCell({
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.key)) e.preventDefault();
 
       // --- Clipboard shortcuts ---
-      const isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const isMac = navigator.userAgent.toUpperCase().includes('MAC');
       const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
 
       if (ctrlKey) {
         switch (e.key.toLowerCase()) {
           case "c":
             e.preventDefault();
-            navigator.clipboard.writeText(String(localValueRef.current ?? ""));
+            await navigator.clipboard.writeText(String(localValueRef.current ?? ""));
             triggerFlash("copy");
             break;
 
           case "x":
             e.preventDefault();
-            navigator.clipboard.writeText(String(localValueRef.current ?? ""));
+            await navigator.clipboard.writeText(String(localValueRef.current ?? ""));
             onChange(columnType === "number" ? "" : "");
             triggerFlash("cut");
             break;
 
           case "v":
             e.preventDefault();
-            (async () => {
+            await (async () => {
               const text = await navigator.clipboard.readText();
               let newValue: CellValue = text;
               if (columnType === "number") {
