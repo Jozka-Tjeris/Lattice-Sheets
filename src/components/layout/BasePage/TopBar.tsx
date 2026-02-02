@@ -1,15 +1,27 @@
 "use client";
 
+import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
+import { useTableIOController } from "~/components/table/controller/TableProvider";
 import { api as trpc } from "~/trpc/react";
 
 interface TopBarProps {
+  tableId: string;
   baseId: string;
+  allowAction: boolean;
 }
 
-export function TopBar({ baseId }: TopBarProps) {
+export function TopBar({ tableId, baseId, allowAction }: TopBarProps) {
   const { handleRenameBase } = useBaseMutations();
+  const { exportJson, importJson, isExporting, isImporting } = useTableIOController();
   const baseNameQuery = trpc.base.getBaseById.useQuery({ baseId });
+  const [fileInput, setFileInput] = useState<File | null>(null);
+
+  const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement, HTMLInputElement>) => {
+    // The selected files are in event.target.files, which is a FileList object.
+    const files = event.target.files;
+    setFileInput((files && files.length > 0) ? files[0]! : null);
+  }, [setFileInput]);
 
   return (
     <div className="border-gray-750 flex h-14 shrink-0 flex-row border-b bg-gray-50">
@@ -55,6 +67,63 @@ export function TopBar({ baseId }: TopBarProps) {
             title="Rename"
           >
             ✏️
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-1">
+        <div className="flex w-[10%] items-center justify-center gap-2">
+          {(isExporting || isImporting) && (
+            <span>Loading...</span>
+          )}
+        </div>
+        <div className="flex w-[30%] items-center justify-center gap-2">
+          <input
+            id="json-upload"
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          <label
+            htmlFor="json-upload"
+            className="cursor-pointer bg-gray-200 px-3 py-1 rounded-sm hover:bg-gray-300"
+          >
+            {fileInput ? "Change file" : "Select JSON file"}
+          </label>
+
+          {fileInput && (
+            <span className="text-sm text-gray-600 truncate max-w-[150px]">
+              {fileInput.name}
+            </span>
+          )}
+        </div>
+        <div className="flex w-[30%] items-center justify-center">
+          <button 
+            className="bg-gray-200 px-2 py-1 rounded-sm"
+            onClick={() => {
+              if(!fileInput){
+                alert("Pick a file first");
+                return;
+              }
+              importJson(fileInput, { mode: "existing-base", baseId }, baseId)
+            }}
+            disabled={allowAction}
+          >
+            <span>
+              Import table data
+            </span>
+          </button>
+        </div>
+        <div className="flex w-[30%] items-center justify-center">
+          <button 
+            className="bg-gray-200 px-2 py-1 rounded-sm"
+            onClick={() => exportJson(tableId)} 
+            disabled={allowAction}
+          >
+            <span>
+              Export table data
+            </span>
           </button>
         </div>
       </div>

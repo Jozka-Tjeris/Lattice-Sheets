@@ -3,6 +3,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { assertTableAccess } from "../routerUtils";
 import { enqueueTableMutation } from "~/server/queue/tableQueue";
+import { exportTableToJson } from "~/server/services/tableExportService";
+import { importTableFromJson } from "~/server/services/tableImportService";
+import { ImportSchema } from "~/server/services/tableIOtypes";
 
 export const tableRouter = createTRPCRouter({
   getTable: protectedProcedure
@@ -102,4 +105,17 @@ export const tableRouter = createTRPCRouter({
 
       return { result, tableId: input.tableId };
     }),
+
+  // IO-related
+  importTable: protectedProcedure
+    .input(ImportSchema)
+    .mutation(({ ctx, input }) =>
+      importTableFromJson(ctx.db, input.payload, ctx.session.user.id, input.target)
+    ),
+
+  exportTable: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(({ ctx, input }) =>
+      exportTableToJson(ctx.db, input.tableId, ctx.session.user.id)
+    ),
 });

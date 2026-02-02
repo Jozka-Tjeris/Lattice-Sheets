@@ -208,7 +208,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       <div className="flex h-screen w-full flex-row overflow-hidden">
         <LeftBar />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TopBar baseId={baseId} />
+          <TopBar tableId={activeTableId ?? ""} baseId={baseId} allowAction={allowCreateTable} />
           <TableSelectionBar
             tables={tablesQuery.data ?? []}
             activeTableId={activeTableId}

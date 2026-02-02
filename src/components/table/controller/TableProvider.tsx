@@ -18,6 +18,8 @@ import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 import { useTableViews } from "./useTableViews";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import { useTableJsonIO } from "./useTableJsonIO";
+import type { ImportTarget } from "~/server/services/tableIOtypes";
 
 export type TableStructureState = {
   rows: TableRow[];
@@ -73,8 +75,16 @@ export type TableViewState = {
   handleDeleteView: (viewId: string) => void;
 }
 
+export type TableIOState = {
+  exportJson: (tableId: string) => Promise<void>;
+  importJson: (file: File, target: ImportTarget, baseId: string) => Promise<void>;
+  isExporting: boolean;
+  isImporting: boolean;
+}
+
 const TableStructureContext = createContext<TableStructureState | undefined>(undefined);
 const TableViewContext = createContext<TableViewState | undefined>(undefined);
+const TableIOContext = createContext<TableIOState | undefined>(undefined);
 
 export const useTableStructureController = () => {
   const ctx = useContext(TableStructureContext);
@@ -96,20 +106,14 @@ export const useTableViewController = () => {
   return ctx;
 };
 
-/**
- * @deprecated Prefer useTableStructureController or useTableViewController
- */
-export const useTableController = () => {
-  const structure = useTableStructureController();
-  const views = useTableViewController();
-
-  return useMemo(
-    () => ({
-      ...structure,
-      ...views,
-    }),
-    [structure, views]
-  );
+export const useTableIOController = () => {
+  const ctx = useContext(TableIOContext);
+  if (!ctx) {
+    throw new Error(
+      "useTableIOController must be used within TableProvider"
+    );
+  }
+  return ctx;
 };
 
 export const INDEX_COL_ID = "__row_index__";
@@ -249,6 +253,9 @@ export function TableProvider({
     setActiveCell, registerRef, updateCell, isNumericalValue,
   } = useTableInteractions(null, tableId, rowsRef, columnsRef, cells, setCells);
 
+  const { exportJson, importJson, isExporting, isImporting
+  } = useTableJsonIO();
+
   const isOptimisticColumnId = (id: string) =>
   id.startsWith("optimistic-col-");
 
@@ -300,7 +307,8 @@ export function TableProvider({
     
     // Get the most recent value directly from the table state
     // This ensures the value is never stale even if the column def doesn't re-run
-    const val = info.getValue();
+    // Note: by default un-initialized cells are undefined, so using nullish operator prevents unwanted updates
+    const val = info.getValue() ?? "";
 
     return (
       <TableCell
@@ -658,11 +666,28 @@ export function TableProvider({
     ]
   );
 
+  const IOValue = useMemo(
+    () => ({
+      exportJson,
+      importJson,
+      isExporting,
+      isImporting,
+    }),
+    [
+      exportJson,
+      importJson,
+      isExporting,
+      isImporting,
+    ]
+  );
+
   return (
-    <TableStructureContext.Provider value={structureValue}>
-      <TableViewContext.Provider value={viewValue}>
-        {children}
-      </TableViewContext.Provider>
-    </TableStructureContext.Provider>
+    <TableIOContext.Provider value={IOValue}>
+      <TableStructureContext.Provider value={structureValue}>
+        <TableViewContext.Provider value={viewValue}>
+          {children}
+        </TableViewContext.Provider>
+      </TableStructureContext.Provider>
+    </TableIOContext.Provider>
   );
 }
