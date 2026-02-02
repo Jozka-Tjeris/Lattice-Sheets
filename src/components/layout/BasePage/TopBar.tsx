@@ -3,6 +3,7 @@
 import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
 import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
+import { WebsiteIcon } from "~/components/ui/WebsiteIcon";
 import { api as trpc } from "~/trpc/react";
 
 interface TopBarProps {
@@ -29,9 +30,7 @@ export function TopBar({ tableId, baseId, allowAction }: TopBarProps) {
         <div
           className="flex items-center justify-center mx-2 h-8 w-8 rounded-sm bg-blue-600"
         >
-          <div className="relative mx-1 my-[6px] text-white">
-            T
-          </div>
+          <WebsiteIcon height={25} fillColor="#ffffff"/>
         </div>
         <div className="flex h-full flex-1 items-center min-w-0"> {/* Parent handles alignment */}
           <span

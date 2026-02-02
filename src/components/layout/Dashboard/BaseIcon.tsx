@@ -32,7 +32,7 @@ export function BaseIcon({
 
   return (
     <div
-      className="group relative flex h-24 items-center rounded-md border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
+      className="group relative flex h-24 items-center rounded-md border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-lg"
       tabIndex={tabIndex}
     >
       {/* Icon Square */}

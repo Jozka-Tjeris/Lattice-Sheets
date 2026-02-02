@@ -18,7 +18,7 @@ export function Sidebar() {
   }, [setFileInput]);
 
   return (
-    <aside className="flex h-full w-75 flex-col gap-2 border-r p-4">
+    <aside className="flex h-full w-75 flex-col gap-2 p-4 bg-white/80">
       <div className="h-[45%] flex flex-col justify-end gap-2 py-2">
         <input
           id="json-upload"
@@ -59,13 +59,13 @@ export function Sidebar() {
             }
           }}
           disabled={!fileInput || creating || isImporting}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:bg-gray-500 disabled:text-gray-100"
         >
           {isImporting ? "Importing..." : "Import Table from JSON as New Base"}
         </button>
       </div>
 
-      <div className="flex my-1 p-1 border-t border-b items-center justify-center h-10">
+      <div className="flex my-1 p-1 border-t border-b items-center justify-center h-10 border-gray-500">
         <span>OR</span>
       </div>
 

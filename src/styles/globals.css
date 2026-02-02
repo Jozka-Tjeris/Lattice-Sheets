@@ -139,4 +139,46 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    min-width: 350px;
+    min-height: 250px;
+    position: relative;
+  }
+
+  .close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding-right: 0.6rem;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+}
+
+@theme {
+  --color-stormy-teal: #006d77;
+  --color-pearl-aqua: #83c5be;
+  --color-alice-blue: #edf6f9;
+  --color-floral-white: #faf6ed;
+  --color-almond-silk: #ffddd2;
+  --color-tangerine-dream: #e29578;
 }
