@@ -62,7 +62,7 @@ export function useTableJsonIO() {
       if(target.mode === "existing-base"){
         await utils.table.listTablesByBaseId.invalidate({ baseId });
       } else{
-        redirect(`/base/${newBaseId}`);
+        return { newBaseId };
       }
     },
     [importTable, utils.table.listTablesByBaseId],

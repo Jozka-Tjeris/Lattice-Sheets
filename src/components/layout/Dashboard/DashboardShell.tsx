@@ -1,6 +1,7 @@
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./SideBar";
 import { BaseList } from "./BaseList";
+import { MobileWarning } from "~/components/ui/MobileWarning";
 
 function MainDashboardContent() {
   return (
@@ -16,6 +17,7 @@ export function DashboardShell() {
   return (
     <div className="flex h-screen flex-col">
       <TopBar />
+      <MobileWarning />
       <div className="flex flex-1 flex-row">
         <Sidebar />
         <MainDashboardContent />

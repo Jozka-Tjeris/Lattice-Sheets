@@ -76,16 +76,8 @@ export type TableViewState = {
   handleDeleteView: (viewId: string) => void;
 }
 
-export type TableIOState = {
-  exportJson: (tableId: string) => Promise<void>;
-  importJson: (file: File, target: ImportTarget, baseId: string) => Promise<void>;
-  isExporting: boolean;
-  isImporting: boolean;
-}
-
 const TableStructureContext = createContext<TableStructureState | undefined>(undefined);
 const TableViewContext = createContext<TableViewState | undefined>(undefined);
-const TableIOContext = createContext<TableIOState | undefined>(undefined);
 
 export const useTableStructureController = () => {
   const ctx = useContext(TableStructureContext);
@@ -102,16 +94,6 @@ export const useTableViewController = () => {
   if (!ctx) {
     throw new Error(
       "useTableViewController must be used within TableProvider"
-    );
-  }
-  return ctx;
-};
-
-export const useTableIOController = () => {
-  const ctx = useContext(TableIOContext);
-  if (!ctx) {
-    throw new Error(
-      "useTableIOController must be used within TableProvider"
     );
   }
   return ctx;
@@ -251,9 +233,6 @@ export function TableProvider({
   const { activeCell, pendingCellUpdatesRef, cellRefs, updateCellsMutation,
     setActiveCell, registerRef, updateCell, isNumericalValue,
   } = useTableInteractions(null, tableId, rowsRef, columnsRef, cells, setCells);
-
-  const { exportJson, importJson, isExporting, isImporting
-  } = useTableJsonIO();
 
   const isOptimisticColumnId = (id: string) =>
   id.startsWith("optimistic-col-");
@@ -665,28 +644,11 @@ export function TableProvider({
     ]
   );
 
-  const IOValue = useMemo(
-    () => ({
-      exportJson,
-      importJson,
-      isExporting,
-      isImporting,
-    }),
-    [
-      exportJson,
-      importJson,
-      isExporting,
-      isImporting,
-    ]
-  );
-
   return (
-    <TableIOContext.Provider value={IOValue}>
-      <TableStructureContext.Provider value={structureValue}>
-        <TableViewContext.Provider value={viewValue}>
-          {children}
-        </TableViewContext.Provider>
-      </TableStructureContext.Provider>
-    </TableIOContext.Provider>
+    <TableStructureContext.Provider value={structureValue}>
+      <TableViewContext.Provider value={viewValue}>
+        {children}
+      </TableViewContext.Provider>
+    </TableStructureContext.Provider>
   );
 }

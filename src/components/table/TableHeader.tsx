@@ -96,19 +96,11 @@ function TableHeaderContent({ isFiltered, isSorted, isPinned, actualId, type, he
             else header.column.pin(false);
           }}
         >
-          <span>
-            📌
-            {isPinned && (
-              <svg className="slash" viewBox="0 0 28 28" style={{
-                position: "absolute",
-                width: 28, height: 28,
-                top: 5.8, right: 10
-                }}>
-                <circle cx="14" cy="14" r="10" className="stroke-gray-600" strokeWidth="2" fill="none"/>
-                <line x1="8" y1="8" x2="21" y2="21" className="stroke-gray-600" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            )}
-          </span>
+          {isPinned ? 
+          <img src="/assets/unpin.png" alt="unpin" width="16" height="16"/>
+          : 
+          <img src="/assets/pin.png" alt="pin" width="16" height="16"/>
+          }
         </button>
       </div>
     </div>
