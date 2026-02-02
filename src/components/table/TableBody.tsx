@@ -1,5 +1,6 @@
 import { flexRender } from "@tanstack/react-table";
-import { useTableStructureController, INDEX_COL_ID } from "@/components/table/controller/TableProvider";
+import { useTableStructureController } from "@/components/table/controller/TableProvider";
+import { INDEX_COL_ID } from "~/constants/table";
 
 export function TableBody() {
   const { table, rows, columns, handleAddRow, handleDeleteRow, ROW_HEIGHT, activeCell, rowVirtualizer, getPinnedLeftStyle } =

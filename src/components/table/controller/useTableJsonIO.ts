@@ -60,12 +60,12 @@ export function useTableJsonIO() {
 
       // Refetch table query based on baseId if applicable, otherwise redirect to new base
       if(target.mode === "existing-base"){
-        utils.table.listTablesByBaseId.invalidate({ baseId });
+        await utils.table.listTablesByBaseId.invalidate({ baseId });
       } else{
         redirect(`/base/${newBaseId}`);
       }
     },
-    [importTable],
+    [importTable, utils.table.listTablesByBaseId],
   );
 
   return {

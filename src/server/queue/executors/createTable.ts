@@ -1,5 +1,6 @@
 import { db } from "~/server/db";
 import type { CreateTableMutation } from "../mutationTypes";
+import { INDEX_COL_ID } from "~/constants/table";
 
 export async function executeCreateTable(m: CreateTableMutation) {
   return db.$transaction(async tx => {
@@ -19,7 +20,7 @@ export async function executeCreateTable(m: CreateTableMutation) {
           columnFilters: [],
           columnVisibility: {},
           columnSizing: {},
-          columnPinning: { left: ["__row_index__"], right: [] },
+          columnPinning: { left: [INDEX_COL_ID], right: [] },
           globalSearch: "",
         },
         isDefault: true,

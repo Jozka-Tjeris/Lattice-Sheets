@@ -2,12 +2,13 @@
 
 import { useCallback } from "react";
 import { flexRender, type Header, type SortDirection } from "@tanstack/react-table";
-import { useTableStructureController, INDEX_COL_ID } from "@/components/table/controller/TableProvider";
+import { useTableStructureController } from "@/components/table/controller/TableProvider";
 import {
   type ColumnType,
   type TableRow,
   COLUMN_CONFIG,
 } from "./controller/tableTypes";
+import { INDEX_COL_ID } from "~/constants/table";
 
 interface TableHeaderContentProps{
   isFiltered: boolean;

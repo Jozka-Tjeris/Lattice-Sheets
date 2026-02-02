@@ -20,6 +20,7 @@ import { useTableViews } from "./useTableViews";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { useTableJsonIO } from "./useTableJsonIO";
 import type { ImportTarget } from "~/server/services/tableIOtypes";
+import { INDEX_COL_ID } from "~/constants/table";
 
 export type TableStructureState = {
   rows: TableRow[];
@@ -115,8 +116,6 @@ export const useTableIOController = () => {
   }
   return ctx;
 };
-
-export const INDEX_COL_ID = "__row_index__";
 
 type TableProviderProps = {
   children: ReactNode;

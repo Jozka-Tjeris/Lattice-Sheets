@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { IOTablePayload, ImportTarget } from "./tableIOtypes";
+import { INDEX_COL_ID } from "~/constants/table";
 
 const isBlankCell = (value: unknown) =>
   value === "" ||
@@ -38,6 +39,23 @@ export async function importTableFromJson(
       data: {
         name: payload.name ?? "Imported Table",
         baseId: base.id,
+      },
+    });
+
+    // 2a. Create Default View
+    await tx.view.create({
+      data: {
+        name: "Default Table View",
+        tableId: table.id,
+        config: {
+          sorting: [],
+          columnFilters: [],
+          columnVisibility: {},
+          columnSizing: {},
+          columnPinning: { left: [INDEX_COL_ID], right: [] },
+          globalSearch: "",
+        },
+        isDefault: true,
       },
     });
 

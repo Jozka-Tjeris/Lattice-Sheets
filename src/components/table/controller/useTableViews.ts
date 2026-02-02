@@ -8,7 +8,7 @@ import { normalizeState, type CachedTableState } from "./useTableStateCache";
 import { ViewConfigSchema, type ViewConfig } from "~/server/api/viewsConfigTypes";
 import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, SortingState, VisibilityState } from "@tanstack/react-table";
 import type { Column } from "./tableTypes";
-import { INDEX_COL_ID } from "./TableProvider";
+import { INDEX_COL_ID } from "~/constants/table";
 import type { JsonValue } from "@prisma/client/runtime/client";
 
 type TableViewStateInput = {

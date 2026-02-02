@@ -106,7 +106,7 @@ export function TopBar({ tableId, baseId, allowAction }: TopBarProps) {
                 alert("Pick a file first");
                 return;
               }
-              importJson(fileInput, { mode: "existing-base", baseId }, baseId)
+              void importJson(fileInput, { mode: "existing-base", baseId }, baseId);
             }}
             disabled={allowAction}
           >

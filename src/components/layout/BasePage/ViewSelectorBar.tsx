@@ -61,14 +61,16 @@ export function ViewSelectorBar({ tableId }: ViewSelectorBarProps) {
               </button>
             )}
 
-            <button
-              className="ml-2 text-xs text-gray-400 hover:text-red-500"
-              title="Delete view"
-              disabled={views.length === 1}
-              onClick={() => void handleDeleteView(view.id)}
-            >
-              🗑
-            </button>
+            {!view.isDefault && (
+              <button
+                className="ml-2 text-xs text-gray-400 hover:text-red-500"
+                title="Delete view"
+                disabled={views.length === 1}
+                onClick={() => void handleDeleteView(view.id)}
+              >
+                🗑
+              </button>
+            )}
           </div>
         ))}
       </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, memo, useCallback } from "react";
 import { type CellValue, type ColumnType } from "./controller/tableTypes";
 import { useMoveActiveCell } from "./controller/tableNavigation";
-import { useTableStructureController, INDEX_COL_ID } from "./controller/TableProvider";
+import { useTableStructureController } from "./controller/TableProvider";
+import { INDEX_COL_ID } from "~/constants/table";
 
 type TableCellProps = {
   value: CellValue;
