@@ -109,6 +109,7 @@ model Column {
   cells Cell[]
 
   @@index([tableId])
+  @@unique([tableId, order])
 }
 
 model Row {
@@ -121,6 +122,7 @@ model Row {
   table Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
   cells Cell[]
 
+  @@unique([tableId, order])
   @@index([tableId, order])
 }
 

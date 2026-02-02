@@ -31,9 +31,9 @@ export type TableStructureState = {
   setGlobalSearch: (search: string) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
   updateCell: (rowId: string, columnId: string, value: CellValue) => void;
-  handleAddRow: (orderNum: number) => void;
+  handleAddRow: () => void;
   handleDeleteRow: (rowId: string, rowPosition: number) => void;
-  handleAddColumn: (orderNum: number) => void;
+  handleAddColumn: () => void;
   handleDeleteColumn: (columnId: string) => void;
   handleRenameColumn: (columnId: string) => void;
   sorting: SortingState;

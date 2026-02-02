@@ -18,7 +18,6 @@ export type AddRowMutation = {
   type: "addRow";
   tableId: string;
   optimisticId: string;
-  order: number;
   userId: string;
 };
 
@@ -26,7 +25,6 @@ export type AddColumnMutation = {
   type: "addColumn";
   tableId: string;
   optimisticId: string;
-  order: number;
   name: string;
   columnType: ColumnType;
   userId: string;

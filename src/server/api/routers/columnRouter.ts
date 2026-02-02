@@ -23,7 +23,6 @@ export const columnRouter = createTRPCRouter({
         label: z.string().optional(),
         type: z.enum(["text", "number"]).optional(),
         optimisticId: z.string(),
-        orderNum: z.number(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -33,7 +32,6 @@ export const columnRouter = createTRPCRouter({
         type: "addColumn",
         tableId: input.tableId,
         optimisticId: input.optimisticId,
-        order: input.orderNum,
         name: input.label ?? "Column",
         columnType: input.type ?? "text",
         userId: ctx.session.user.id,

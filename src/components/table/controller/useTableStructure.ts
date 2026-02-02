@@ -58,7 +58,7 @@ export function useTableStructure(
   // Handlers
   // --------------------
   const handleAddRow = useCallback(
-    async (orderNum: number) => {
+    async () => {
       if(!userId) return; // not logged in 
       if(!columns.length) return;
       if(isViewDirty){
@@ -71,7 +71,7 @@ export function useTableStructure(
       const newRowLocal: TableRow = {
         id: optimisticId,
         internalId: optimisticId,
-        order: orderNum,
+        order: rows.length + 1, //Placeholder
         optimistic: true,
       };
       setRows((prev) => [...prev, newRowLocal]);
@@ -93,15 +93,14 @@ export function useTableStructure(
       try {
         const { result } = await addRowMutation.mutateAsync({
           tableId,
-          orderNum,
           optimisticId,
         });
 
-        // Swap optimistic ID with real ID
+        // Swap optimistic ID with real ID, also legitimize order
         setRows((prev) =>
           prev.map((r) =>
             r.id === optimisticId
-              ? { ...r, id: result.id, optimistic: false }
+              ? { ...r, id: result.id, order: result.order, optimistic: false }
               : r
           )
         );
@@ -128,18 +127,18 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, columns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation, utils]
+    [tableId, setRows, columns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation, utils, rows.length]
   );
 
   const handleAddColumn = useCallback(
-    async (orderNum: number) => {
+    async () => {
       if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before adding any columns");
         return;
       }
       if(!confirmStructuralChange("Do you want to add a column?")) return;
-      const colLabel = prompt("Enter column name:", `Column ${orderNum + 1}`);
+      const colLabel = prompt("Enter column name:", "New Column");
       if(!colLabel) return;
       if(!colLabel?.trim()){
         alert("New column name cannot be empty");
@@ -158,7 +157,7 @@ export function useTableStructure(
         id: optimisticId,
         internalId: optimisticId,
         label: colLabel,
-        order: orderNum,
+        order: columns.length + 1, //Placeholder
         columnType: type,
         optimistic: true,
       };
@@ -167,7 +166,7 @@ export function useTableStructure(
         name: colLabel,
         columnType: type,
         tableId,
-        order: orderNum,
+        order: optimisticColumn.order,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -183,7 +182,6 @@ export function useTableStructure(
         const { result } = await addColumnMutation.mutateAsync({
           tableId,
           label: colLabel,
-          orderNum,
           type,
           optimisticId,
         });
@@ -191,7 +189,7 @@ export function useTableStructure(
         setColumns((prev) =>
           prev.map((c) =>
             c.id === optimisticId
-              ? { ...c, id: result.id, optimistic: false }
+              ? { ...c, id: result.id, order: result.order, optimistic: false }
               : c
           )
         );
@@ -220,7 +218,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation, utils]
+    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation, utils, columns.length]
   );
 
   const handleDeleteRow = useCallback(

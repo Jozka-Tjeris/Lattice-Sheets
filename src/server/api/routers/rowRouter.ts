@@ -20,7 +20,6 @@ export const rowRouter = createTRPCRouter({
     .input(
       z.object({
         tableId: z.string(),
-        orderNum: z.number(),
         optimisticId: z.string(),
       }),
     )
@@ -31,7 +30,6 @@ export const rowRouter = createTRPCRouter({
         type: "addRow",
         tableId: input.tableId,
         optimisticId: input.optimisticId,
-        order: input.orderNum,
         userId: ctx.session.user.id,
       });
 

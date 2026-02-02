@@ -145,7 +145,7 @@ export function TableBody() {
                 }}
               >
                 <button
-                  onClick={() => {handleAddRow(rows.length + 1)}}
+                  onClick={() => {handleAddRow()}}
                   disabled={!hasColumns}
                   className={`inline-flex h-6 w-6 items-center justify-center rounded text-lg leading-none text-white shadow-sm transition 
                     ${hasColumns ? 
