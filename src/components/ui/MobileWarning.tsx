@@ -34,7 +34,7 @@ export function MobileWarning() {
   return (
     <div className="bg-yellow-100 border-b border-yellow-300 px-4 py-3 text-sm text-yellow-900 flex items-center justify-between">
       <span>
-        Heads up: This app isn't fully supported on mobile or touch-only
+        Heads up: This app isn&apos;t fully supported on mobile or touch-only
         devices. Some features may not work as intended.
       </span>
       <button

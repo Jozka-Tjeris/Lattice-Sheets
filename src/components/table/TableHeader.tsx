@@ -9,6 +9,7 @@ import {
   COLUMN_CONFIG,
 } from "./controller/tableTypes";
 import { INDEX_COL_ID } from "~/constants/table";
+import Image from "next/image";
 
 interface TableHeaderContentProps{
   isFiltered: boolean;
@@ -97,9 +98,9 @@ function TableHeaderContent({ isFiltered, isSorted, isPinned, actualId, type, he
           }}
         >
           {isPinned ? 
-          <img src="/assets/unpin.png" alt="unpin" width="16" height="16"/>
+          <Image src="/assets/unpin.png" alt="unpin" width="16" height="16"/>
           : 
-          <img src="/assets/pin.png" alt="pin" width="16" height="16"/>
+          <Image src="/assets/pin.png" alt="pin" width="16" height="16"/>
           }
         </button>
       </div>

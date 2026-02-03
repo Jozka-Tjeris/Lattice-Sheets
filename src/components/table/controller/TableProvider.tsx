@@ -18,8 +18,6 @@ import { useTableStructure } from "./useTableStructure";
 import { normalizeState, useTableStateCache, type CachedTableState } from "./useTableStateCache";
 import { useTableViews } from "./useTableViews";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
-import { useTableJsonIO } from "./useTableJsonIO";
-import type { ImportTarget } from "~/server/services/tableIOtypes";
 import { INDEX_COL_ID } from "~/constants/table";
 
 export type TableStructureState = {
