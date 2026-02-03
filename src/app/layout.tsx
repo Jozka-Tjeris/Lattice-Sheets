@@ -7,8 +7,8 @@ import { TRPCReactProvider } from "~/trpc/react";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
-  title: "Not Airtable",
-  description: "An Airtable Clone",
+  title: "Lattice Sheets",
+  description: "Simple Spreadsheet App",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

@@ -50,3 +50,6 @@ yarn-error.log*
 
 # Prisma owner ID
 /prisma/seed.config.ts
+
+# Ignore client-related files
+/client*
