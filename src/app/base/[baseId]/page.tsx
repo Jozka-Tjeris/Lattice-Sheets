@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: BasePageProps): Promise<Metad
   const base = await caller.base.getBaseById({ baseId });
 
   return {
-    title: base?.name ? `${base.name} - Not Airtable` : "Untitled Base - Not Airtable",
+    title: base?.name ? `${base.name} - Lattice Sheets` : "Untitled Base - Lattice Sheets",
   };
 }
 
