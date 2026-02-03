@@ -5,7 +5,11 @@ import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
 import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
 
-export function Sidebar() {
+interface SidebarProps{
+  isDarkTheme: boolean;
+}
+
+export function Sidebar({ isDarkTheme }: SidebarProps) {
   const [creating, setCreating] = useState(false);
   const [fileInput, setFileInput] = useState<File | null>(null);
   const { handleCreateBase } = useBaseMutations();
@@ -18,7 +22,7 @@ export function Sidebar() {
   }, [setFileInput]);
 
   return (
-    <aside className="flex h-full w-75 flex-col gap-2 p-4 bg-white/80">
+    <aside className={`flex min-h-110 w-75 flex-col shrink-0 gap-2 p-4 ${isDarkTheme ? "bg-gray-400/70" : "bg-black/30"}`}>
       <div className="h-[45%] flex flex-col justify-end gap-2 py-2">
         <input
           id="json-upload"
@@ -85,7 +89,7 @@ export function Sidebar() {
           disabled={creating || isImporting}
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
