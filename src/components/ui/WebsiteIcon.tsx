@@ -8,7 +8,7 @@ export function WebsiteIcon({ height = 30, fillColor = "" }: WebsiteIconProps) {
     <svg
       width={height * 1.2}
       height={height}
-      viewBox="0 0 44 40"
+      viewBox="0 0 43 40"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -34,7 +34,7 @@ export function WebsiteIcon({ height = 30, fillColor = "" }: WebsiteIconProps) {
       <use href="#tile" transform="translate(5 0)" className="fill-stormy-teal"/>
 
       {/* Row 2 */}
-      <use href="#tile" transform="translate(0 16)" fill="#718178"/>
+      <use href="#tile" transform="translate(0 16)" className="fill-grey-olive"/>
       <use href="#tile" transform="translate(18 16)" className="fill-tangerine-dream"/>
 
       {/* Shared styling */}

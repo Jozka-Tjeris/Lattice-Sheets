@@ -1,16 +1,14 @@
 import { useBaseMutations } from "~/components/base/useBaseMutations";
 
-export function BaseIcon({
-  baseId,
-  name,
-  updatedAt,
-  tabIndex,
-}: {
+interface BaseIconProps{
   baseId: string;
   name: string;
   updatedAt: Date;
   tabIndex: number;
-}) {
+  iconColor: string;
+}
+
+export function BaseIcon({ baseId, name, updatedAt, tabIndex, iconColor }: BaseIconProps) {
   const { handleRenameBase, handleDeleteBase } = useBaseMutations();
 
   // Calculate the difference in days
@@ -36,7 +34,7 @@ export function BaseIcon({
       tabIndex={tabIndex}
     >
       {/* Icon Square */}
-      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-[#006d77] text-xl font-medium text-white">
+      <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl text-xl font-medium text-white" style={{ backgroundColor: iconColor }}>
         <span>{capitalizeFirstLetter(name)}</span>
       </div>
 

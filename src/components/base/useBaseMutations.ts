@@ -103,8 +103,8 @@ export function useBaseMutations() {
   });
 
   const handleCreateBase = useCallback(
-    (name: string) => {
-      return createBaseMutation.mutateAsync({ name });
+    (name: string, iconColor: string) => {
+      return createBaseMutation.mutateAsync({ name, iconColor });
     },
     [createBaseMutation],
   );

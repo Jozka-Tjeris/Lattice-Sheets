@@ -24,6 +24,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   const utils = trpc.useUtils();
 
   const tablesQuery = trpc.table.listTablesByBaseId.useQuery({ baseId });
+  const baseQuery = trpc.base.getBaseById.useQuery({ baseId });
   const hasTables = !!tablesQuery.data && tablesQuery.data.length > 0;
 
   // Sync activeTableId with query results
@@ -208,7 +209,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       <div className="flex h-screen w-full flex-row overflow-hidden">
         <LeftBar />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TopBar tableId={activeTableId ?? ""} baseId={baseId} allowAction={allowCreateTable} />
+          <TopBar tableId={activeTableId ?? ""} baseId={baseId} allowAction={allowCreateTable} baseQueryData={baseQuery.data}/>
           <TableSelectionBar
             tables={tablesQuery.data ?? []}
             activeTableId={activeTableId}
@@ -218,6 +219,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
             creatingTable={creatingTable}
             loadingTable={allowCreateTable}
             onDeleteTable={handleDeleteTable}
+            colorTheme={baseQuery.data?.iconColor}
           />
           <GridViewBar tableId={activeTableId ?? ""} />
           <div className="flex min-h-0 min-w-0 flex-1 flex-row">

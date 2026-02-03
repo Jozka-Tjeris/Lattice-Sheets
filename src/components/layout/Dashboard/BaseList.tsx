@@ -25,6 +25,7 @@ export function BaseList() {
           name={base.name}
           updatedAt={base.updatedAt}
           tabIndex={idx}
+          iconColor={base.iconColor}
         />
       ))}
     </div>

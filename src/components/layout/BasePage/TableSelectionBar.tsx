@@ -9,6 +9,7 @@ interface TableSelectionBarProps {
   onRenameTable: (tableId: string) => void;
   creatingTable: boolean;
   loadingTable: boolean;
+  colorTheme: string | undefined;
 }
 
 export function TableSelectionBar({
@@ -20,9 +21,12 @@ export function TableSelectionBar({
   onRenameTable,
   creatingTable,
   loadingTable,
+  colorTheme,
 }: TableSelectionBarProps) {
   return (
-    <div className="h-8 shrink-0 overflow-x-auto border-t border-gray-300 bg-blue-100 no-scrollbar">
+    <div className="h-8 shrink-0 overflow-x-auto border-t border-gray-300 bg-gray-100 no-scrollbar"
+      style={{ backgroundColor: colorTheme + "59" }}
+    >
       <div className="flex h-full flex-1 items-stretch">
         {tables.map((table) => {
           const isActive = table.id === activeTableId;

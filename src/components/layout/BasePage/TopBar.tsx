@@ -4,18 +4,24 @@ import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
 import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
 import { WebsiteIcon } from "~/components/ui/WebsiteIcon";
-import { api as trpc } from "~/trpc/react";
 
 interface TopBarProps {
   tableId: string;
   baseId: string;
   allowAction: boolean;
+  baseQueryData?: {
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    ownerId: string;
+    iconColor: string;
+  } | undefined;
 }
 
-export function TopBar({ tableId, baseId, allowAction }: TopBarProps) {
+export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarProps) {
   const { handleRenameBase } = useBaseMutations();
   const { exportJson, importJson, isExporting, isImporting } = useTableJsonIO();
-  const baseNameQuery = trpc.base.getBaseById.useQuery({ baseId });
   const [fileInput, setFileInput] = useState<File | null>(null);
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement, HTMLInputElement>) => {
@@ -28,24 +34,27 @@ export function TopBar({ tableId, baseId, allowAction }: TopBarProps) {
     <div className="border-gray-750 flex h-14 shrink-0 flex-row border-b bg-gray-50">
       <div className="flex h-full w-[30%] flex-row items-center">
         <div
-          className="flex items-center justify-center mx-2 h-8 w-8 rounded-sm bg-blue-600"
+          className="flex items-center justify-center mx-2 h-8 w-8 rounded-sm bg-gray-200"
+          style={{ backgroundColor: baseQueryData?.iconColor }}
         >
           <WebsiteIcon height={25} fillColor="#ffffff"/>
         </div>
         <div className="flex h-full flex-1 items-center min-w-0"> {/* Parent handles alignment */}
           <span
             className="block truncate px-2 select-none" // Child handles truncation
-            title={baseNameQuery.data?.name ?? ""}
+            title={baseQueryData?.name ?? ""}
           >
-            {baseNameQuery.data?.name ?? ""}
+            {baseQueryData?.name ?? ""}
           </span>
-          <button
-            className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
-            onClick={() => handleRenameBase(baseId, baseNameQuery.data?.name ?? "")}
-            title="Rename"
-          >
-            ✏️
-          </button>
+          {baseQueryData && (
+            <button
+              className="p-1 text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+              onClick={() => handleRenameBase(baseId, baseQueryData?.name ?? "")}
+              title="Rename"
+            >
+              ✏️
+            </button>
+          )}
         </div>
       </div>
       <div className="flex flex-1">

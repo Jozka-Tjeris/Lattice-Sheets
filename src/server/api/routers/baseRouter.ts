@@ -33,12 +33,13 @@ export const baseRouter = createTRPCRouter({
   // ------------------
 
   createBase: protectedProcedure
-    .input(z.object({ name: z.string().min(1) }))
+    .input(z.object({ name: z.string().min(1), iconColor: z.string() }))
     .mutation(({ ctx, input }) => {
       return ctx.db.base.create({
         data: {
           name: input.name,
           ownerId: ctx.session.user.id,
+          iconColor: input.iconColor,
         },
       });
     }),

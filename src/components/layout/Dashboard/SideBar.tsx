@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
 import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
+import { iconColors } from "~/constants/table";
 
 interface SidebarProps{
   isDarkTheme: boolean;
+  currentTheme: number;
 }
 
-export function Sidebar({ isDarkTheme }: SidebarProps) {
+export function Sidebar({ isDarkTheme, currentTheme }: SidebarProps) {
   const [creating, setCreating] = useState(false);
   const [fileInput, setFileInput] = useState<File | null>(null);
   const { handleCreateBase } = useBaseMutations();
@@ -22,7 +24,7 @@ export function Sidebar({ isDarkTheme }: SidebarProps) {
   }, [setFileInput]);
 
   return (
-    <aside className={`flex min-h-110 w-75 flex-col shrink-0 gap-2 p-4 ${isDarkTheme ? "bg-gray-400/70" : "bg-black/30"}`}>
+    <aside className={`flex min-h-110 w-75 flex-col shrink-0 gap-2 p-4 ${isDarkTheme ? "bg-gray-400/50" : "bg-black/30"}`}>
       <div className="h-[45%] flex flex-col justify-end gap-2 py-2">
         <input
           id="json-upload"
@@ -69,7 +71,7 @@ export function Sidebar({ isDarkTheme }: SidebarProps) {
         </button>
       </div>
 
-      <div className="flex my-1 p-1 border-t border-b items-center justify-center h-10 border-gray-500">
+      <div className="flex my-1 p-1 border-t border-b items-center justify-center h-10 border-black bg-white/30">
         <span>OR</span>
       </div>
 
@@ -78,7 +80,7 @@ export function Sidebar({ isDarkTheme }: SidebarProps) {
           onClick={async () => {
             setCreating(true);
             try {
-              await handleCreateBase("Untitled Base"); // handleCreateBase should return mutateAsync
+              await handleCreateBase("Untitled Base", iconColors[Math.floor(currentTheme / 2)]!);
             } catch (err) {
               alert("Failed to create base");
               console.error(err);
