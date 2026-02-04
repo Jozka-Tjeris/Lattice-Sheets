@@ -111,11 +111,17 @@ export const TableCell = memo(function TableCell({
     setTimeout(() => { isCancellingRef.current = false; }, 0);
   }, [value]);
 
+  const canStartNumericEdit = (key: string) => {
+    return isNumericalValue(key);
+  };
+
   // Key handling
   const moveActiveCell = useMoveActiveCell();
   const handleKeyDown = async (
     e: React.KeyboardEvent<HTMLDivElement | HTMLInputElement>
   ) => {
+    const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+
     if (isEditing) {
       switch (e.key) {
         case "Enter": e.preventDefault(); commit(); break;
@@ -163,6 +169,16 @@ export const TableCell = memo(function TableCell({
             })();
             break;
         }
+      }
+
+      if (isPrintable) {
+        if (columnType === "number" && !canStartNumericEdit(e.key)) {
+          return;
+        }
+        e.preventDefault();
+        setLocalValue(e.key);
+        setIsEditing(true);
+        return;
       }
 
       // --- navigation + editing keys ---
