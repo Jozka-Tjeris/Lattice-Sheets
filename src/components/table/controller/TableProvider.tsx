@@ -267,8 +267,8 @@ export function TableProvider({
       const rId = row.internalId ?? row.id;
       return columns.some((col) => {
         const cId = col.internalId ?? col.id;
-        const value = cells[`${rId}:${cId}`];
-        return value != null && String(value).toLowerCase().includes(search);
+        const value = cells[`${rId}:${cId}`] ?? "";
+        return value !== "" && String(value).toLowerCase().includes(search);
       });
     });
   }, [rows, columns, cells, globalSearch]);
