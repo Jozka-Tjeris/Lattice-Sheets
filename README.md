@@ -1,16 +1,20 @@
 # Lattice Sheets
 An Airtable-inspired spreadsheet application focused on UX-driven architecture and optimistic state management.
 
-**Main table interface**
-[Image]
+### Main table interface
 
-**Table state changes (sorting, filtering, pinning) & View Configurations (saved vs draft)**
-[GIF]
+<img width="2146" height="1750" alt="table_state" src="https://github.com/user-attachments/assets/96eef5b1-303f-4805-94dd-10ca342c1e50" />
 
-**Keyboard navigation & inline editing**
-[GIF]
+### Table state changes (sorting, filtering, pinning) & View Configurations (saved vs draft)
 
-**Intended audience**
+![view_config_table](https://github.com/user-attachments/assets/824ac96c-a9b9-4a27-b6cc-8cfaf2057cd0)
+
+### Keyboard navigation & inline editing
+
+![key_nav_table](https://github.com/user-attachments/assets/0b6eeef5-c99f-4f69-beb8-ae6306b00b5b)
+
+### Intended audience
+
 This project is aimed at those interested in complex UI state management, optimistic updates, and UX-driven backend design.
 
 ## 1. Project overview
