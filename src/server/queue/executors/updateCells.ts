@@ -21,7 +21,7 @@ export async function executeUpdateCells(m: UpdateCellsMutation) {
       if (!type) continue;
 
       let value: string;
-      if (type === "number") {
+      if (type === "number" && c.value !== "") {
         const n = Number(c.value);
         if (!Number.isFinite(n)) continue;
         value = n.toString();
