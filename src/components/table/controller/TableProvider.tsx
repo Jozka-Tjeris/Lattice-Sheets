@@ -368,12 +368,12 @@ export function TableProvider({
     columnVisibility: colVisDep 
   } = table.getState();
 
+  const pinnedLeftColumns = table.getLeftLeafColumns();
+
   const pinnedLeftMeta = useMemo(() => {
     let offset = 0;
     const map: Record<string,
       { id: string; left: number; width: number; index: number }> = {};
-
-    const pinnedLeftColumns = table.getLeftLeafColumns();
 
     pinnedLeftColumns.forEach((col, index) => {
       map[col.id] = {
@@ -392,7 +392,7 @@ export function TableProvider({
     };
   }, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [table, colPinDep, colSizeDep, colVisDep]);
+  [table, colPinDep, colSizeDep, colVisDep, pinnedLeftColumns]);
 
   const isPinnedLeft = useCallback(
     (columnId: string) => !!pinnedLeftMeta.map[columnId],

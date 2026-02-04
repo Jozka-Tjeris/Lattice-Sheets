@@ -165,6 +165,7 @@ export function TableHeader() {
                 <th
                   key={header.id}
                   style={header.column.getIsPinned() ? {
+                    width: header.getSize(),
                     //Add min and max width to prevent shrinking and stretching respectively
                     minWidth: header.column.columnDef.minSize,
                     maxWidth: header.column.columnDef.maxSize,
