@@ -58,7 +58,7 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
         </div>
       </div>
       <div className="flex flex-1">
-        <div className={`flex w-[60%] items-center gap-2 justify-end pr-1`}>
+        <div className={`flex w-[70%] items-center gap-2 justify-end pr-1`}>
           {(isExporting || isImporting) && (
             <span className="text-sm">Loading...</span>
           )}
@@ -72,18 +72,18 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
 
           <label
             htmlFor="json-upload"
-            className="cursor-pointer bg-gray-200 px-3 py-[6] rounded-sm hover:bg-gray-300 text-sm min-w-[24%]"
+            className="cursor-pointer bg-gray-200 px-3 py-[6] rounded-sm hover:bg-gray-300 text-sm min-w-[12%]"
           >
             {fileInput ? "Change file" : "Select JSON file"}
           </label>
 
           {fileInput && (
-            <span className="text-sm text-gray-600 truncate max-w-[76%]">
+            <span className="text-sm text-gray-600 truncate max-w-[88%]">
               {fileInput.name}
             </span>
           )}
         </div>
-        <div className="flex w-[20%] items-center justify-center">
+        <div className="flex w-[15%] items-center justify-center">
           <button 
             className="bg-gray-200 px-2 py-1 rounded-sm"
             onClick={() => {
@@ -95,19 +95,19 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
             }}
             disabled={allowAction}
           >
-            <span className="text-sm">
-              Import table data
+            <span className="text-sm truncate">
+              Import table
             </span>
           </button>
         </div>
-        <div className="flex w-[20%] items-center justify-center">
+        <div className="flex w-[15%] items-center justify-center">
           <button 
             className="bg-gray-200 px-2 py-1 rounded-sm"
             onClick={() => exportJson(tableId)} 
             disabled={allowAction}
           >
-            <span className="text-sm">
-              Export table data
+            <span className="text-sm truncate">
+              Export table
             </span>
           </button>
         </div>
