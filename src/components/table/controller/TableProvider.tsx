@@ -317,7 +317,7 @@ export function TableProvider({
       const colId = col.internalId ?? col.id;
       return {
         id: colId,
-        accessorFn: (row: { internalId: string; id: string; }) => cells[`${row.internalId ?? row.id}:${colId}`],
+        accessorFn: (row: { internalId: string; id: string; }) => cells[`${row.internalId ?? row.id}:${colId}`] ?? "",
         header: col.label,
         size: col.width ?? DEFAULT_COL_WIDTH,
         minSize: MIN_COL_WIDTH,
