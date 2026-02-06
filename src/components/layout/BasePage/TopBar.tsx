@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
-import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
+import { useTableIO } from "~/components/table/controller/useTableIO";
 import { WebsiteIcon } from "~/components/ui/WebsiteIcon";
 
 interface TopBarProps {
@@ -21,7 +21,7 @@ interface TopBarProps {
 
 export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarProps) {
   const { handleRenameBase } = useBaseMutations();
-  const { exportJson, importJson, isExporting, isImporting } = useTableJsonIO();
+  const { exportJson, exportCsv, importJson, isExporting, isImporting } = useTableIO();
   const [fileInput, setFileInput] = useState<File | null>(null);
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement, HTMLInputElement>) => {
@@ -57,8 +57,8 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
           )}
         </div>
       </div>
-      <div className="flex flex-1">
-        <div className={`flex w-[70%] items-center gap-2 justify-end pr-1`}>
+      <div className="flex flex-1 justify-end">
+        <div className={`flex items-center gap-2 pr-2`}>
           {(isExporting || isImporting) && (
             <span className="text-sm">Loading...</span>
           )}
@@ -83,9 +83,9 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
             </span>
           )}
         </div>
-        <div className="flex w-[15%] items-center justify-center">
+        <div className="flex items-center pr-1">
           <button 
-            className="bg-gray-200 px-2 py-1 rounded-sm"
+            className="bg-gray-200 px-2 py-1 rounded-sm hover:bg-gray-300 cursor-pointer disabled:cursor-not-allowed"
             onClick={() => {
               if(!fileInput){
                 alert("Pick a file first");
@@ -96,18 +96,27 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
             disabled={allowAction}
           >
             <span className="text-sm truncate">
-              Import table
+              Import JSON as table
             </span>
           </button>
         </div>
-        <div className="flex w-[15%] items-center justify-center">
+        <div className="flex items-center pr-1">
           <button 
-            className="bg-gray-200 px-2 py-1 rounded-sm"
+            className="bg-gray-200 px-2 py-1 mx-1 rounded-sm hover:bg-gray-300 cursor-pointer disabled:cursor-not-allowed"
             onClick={() => exportJson(tableId)} 
             disabled={allowAction}
           >
             <span className="text-sm truncate">
-              Export table
+              Export as JSON
+            </span>
+          </button>
+          <button 
+            className="bg-gray-200 px-2 mx-1 py-1 rounded-sm hover:bg-gray-300 cursor-pointer disabled:cursor-not-allowed"
+            onClick={() => exportCsv(tableId)}
+            disabled={allowAction}
+          >
+            <span className="text-sm truncate">
+              Export as CSV
             </span>
           </button>
         </div>

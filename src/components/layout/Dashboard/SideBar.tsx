@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState, type ChangeEvent } from "react";
 import { useBaseMutations } from "~/components/base/useBaseMutations";
-import { useTableJsonIO } from "~/components/table/controller/useTableJsonIO";
+import { useTableIO } from "~/components/table/controller/useTableIO";
 import { iconColors } from "~/constants/table";
 
 interface SidebarProps{
@@ -15,7 +15,7 @@ export function Sidebar({ isDarkTheme, currentTheme }: SidebarProps) {
   const [creating, setCreating] = useState(false);
   const [fileInput, setFileInput] = useState<File | null>(null);
   const { handleCreateBase } = useBaseMutations();
-  const { importJson, isImporting } = useTableJsonIO();
+  const { importJson, isImporting } = useTableIO();
   const router = useRouter();
 
   const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement, HTMLInputElement>) => {
