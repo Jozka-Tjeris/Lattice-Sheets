@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 import type { ImportTarget, IOTablePayload } from "~/server/services/tableIOtypes";
 import { api as trpc } from "~/trpc/react";
 
@@ -54,6 +55,10 @@ export function useTableIO() {
     ) => {
       if (file.size > 10 * 1024 * 1024) {
         throw new Error("File too large");
+      }
+      if(!utils.table.listTablesByBaseId.getData()) return;
+      if(utils.table.listTablesByBaseId.getData()!.length >= LIMITS.TABLE){
+        warnLimitReached("TABLE");
       }
       const text = await file.text();
       let parsed: unknown;

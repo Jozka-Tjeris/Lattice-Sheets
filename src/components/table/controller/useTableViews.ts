@@ -10,6 +10,7 @@ import type { ColumnFiltersState, ColumnPinningState, ColumnSizingState, Sorting
 import type { Column } from "./tableTypes";
 import { INDEX_COL_ID } from "~/constants/table";
 import type { JsonValue } from "@prisma/client/runtime/client";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 
 type TableViewStateInput = {
   sorting: SortingState;
@@ -162,6 +163,11 @@ export function useTableViews(
   const handleCreateView = useCallback(async () => {
     if (!userId || !parsedConfig.success) return;
     const tableIdAtCallTime = tableId;
+
+    if(views.length >= LIMITS.VIEW){
+      warnLimitReached("VIEW");
+      return;
+    }
 
     if (!confirmStructuralChange("Do you want to create a new view?")) return;
     const newViewName = prompt("Enter view name (be careful, you can't change the view name later):", "New view");

@@ -3,6 +3,7 @@ import { type CellValue, type ColumnType } from "./controller/tableTypes";
 import { useMoveActiveCell } from "./controller/tableNavigation";
 import { useTableStructureController } from "./controller/TableProvider";
 import { INDEX_COL_ID } from "~/constants/table";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 
 type TableCellProps = {
   value: CellValue;
@@ -25,7 +26,7 @@ export const TableCell = memo(function TableCell({
   cellId,
   registerRef,
 }: TableCellProps) {
-  const { activeCell, isNumericalValue } = useTableStructureController();
+  const { activeCell, isNumericalValue, canCreateNewCell } = useTableStructureController();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +77,13 @@ export const TableCell = memo(function TableCell({
     }
   }, [isEditing, isActive]);
 
+  const cancel = useCallback(() => {
+    isCancellingRef.current = true;
+    setLocalValue(value ?? "");
+    setIsEditing(false);
+    setTimeout(() => { isCancellingRef.current = false; }, 0);
+  }, [value]);
+
   // Commit logic
   const commit = useCallback(() => {
     if (!isEditingRef.current || isCommittingRef.current || isCancellingRef.current) return;
@@ -84,6 +92,12 @@ export const TableCell = memo(function TableCell({
     isCommittingRef.current = true;
 
     let finalValue: CellValue = valueToCommit;
+    if (!canCreateNewCell(rowId, columnId, finalValue)) {
+      warnLimitReached("CELL");
+      cancel();
+      isCommittingRef.current = false;
+      return;
+    }
     if (columnType === "number") {
       if (valueToCommit === "") finalValue = "";
       else {
@@ -102,14 +116,7 @@ export const TableCell = memo(function TableCell({
 
     setIsEditing(false);
     isCommittingRef.current = false;
-  }, [columnType, value, onChange]);
-
-  const cancel = useCallback(() => {
-    isCancellingRef.current = true;
-    setLocalValue(value ?? "");
-    setIsEditing(false);
-    setTimeout(() => { isCancellingRef.current = false; }, 0);
-  }, [value]);
+  }, [columnType, value, onChange, canCreateNewCell, cancel, columnId, rowId]);
 
   const canStartNumericEdit = (key: string) => {
     return isNumericalValue(key);
@@ -158,11 +165,16 @@ export const TableCell = memo(function TableCell({
           case "v":
             e.preventDefault();
             await (async () => {
-              const text = await navigator.clipboard.readText();
+              let text = await navigator.clipboard.readText();
+              text = text.replace(/\r?\n/g, "");
               let newValue: CellValue = text;
-              if (columnType === "number") {
+              if(columnType === "number"){
+                text = text.slice(0, LIMITS.NUM);
                 const num = Number(text);
                 newValue = isNaN(num) ? "" : num;
+              } 
+              else{
+                newValue = text.slice(0, LIMITS.TEXT);
               }
               onChange(newValue);
               triggerFlash("paste");
@@ -221,9 +233,12 @@ export const TableCell = memo(function TableCell({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    if (columnType === "number") {
+    if (columnType === "number" && val.length <= LIMITS.NUM) {
       if (isNumericalValue(val)) setLocalValue(val);
-    } else setLocalValue(val);
+    }
+    else if(val.length <= LIMITS.TEXT){
+      setLocalValue(val);
+    }
   };
 
   // --- Row index column detection ---

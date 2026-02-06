@@ -125,7 +125,7 @@ export async function exportTableToCsv(
   // Build a map of cell values for easy lookup
   const cellMap: Record<string, Record<string, string>> = {};
   for (const cell of cells) {
-    if (!cellMap[cell.rowId]) cellMap[cell.rowId] = {};
+    cellMap[cell.rowId] ??= {};
     cellMap[cell.rowId]![cell.columnId] = cell.value ?? "";
   }
 

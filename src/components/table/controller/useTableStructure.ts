@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { TableRow, Column, ColumnType } from "./tableTypes";
 import { useSession } from "next-auth/react";
 import { api as trpc } from "~/trpc/react";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 
 export function useTableStructure(
   tableId: string,
@@ -63,6 +64,10 @@ export function useTableStructure(
       if(!columns.length) return;
       if(isViewDirty){
         alert("The current view must be saved before adding any rows");
+        return;
+      }
+      if(rows.length >= LIMITS.ROW){
+        warnLimitReached("ROW");
         return;
       }
       if(!confirmStructuralChange("Do you want to add a row?")) return;
@@ -135,6 +140,10 @@ export function useTableStructure(
       if(!userId) return; // not logged in
       if(isViewDirty){
         alert("The current view must be saved before adding any columns");
+        return;
+      }
+      if(columns.length >= LIMITS.COL){
+        warnLimitReached("COL");
         return;
       }
       if(!confirmStructuralChange("Do you want to add a column?")) return;

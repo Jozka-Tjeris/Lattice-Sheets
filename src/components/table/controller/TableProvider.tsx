@@ -19,6 +19,7 @@ import { normalizeState, useTableStateCache, type CachedTableState } from "./use
 import { useTableViews } from "./useTableViews";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { INDEX_COL_ID } from "~/constants/table";
+import { LIMITS } from "~/constants/limits";
 
 export type TableStructureState = {
   rows: TableRow[];
@@ -30,6 +31,7 @@ export type TableStructureState = {
   setGlobalSearch: (search: string) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
   updateCell: (rowId: string, columnId: string, value: CellValue) => void;
+  canCreateNewCell: (rowId: string, columnId: string, nextValue: CellValue) => boolean;
   handleAddRow: () => void;
   handleDeleteRow: (rowId: string, rowPosition: number) => void;
   handleAddColumn: () => void;
@@ -529,7 +531,27 @@ export function TableProvider({
       flushPendingCellUpdates(); // run exactly once
     };
     // Only include stable deps here
-  }, [flushPendingCellUpdates]); 
+  }, [flushPendingCellUpdates]);
+
+  const canCreateNewCell = useCallback(
+    (rowId: string, columnId: string, nextValue: CellValue) => {
+      const key = `${rowId}:${columnId}`;
+      const prevValue = cells[key];
+
+      const wasEmpty = !prevValue || String(prevValue).length === 0;
+      const isNowNonEmpty =
+        nextValue !== null &&
+        nextValue !== undefined &&
+        String(nextValue).length > 0;
+
+      if (!wasEmpty || !isNowNonEmpty) return true;
+
+      const count = Object.values(cells).filter(
+        v => v !== null && v !== undefined && String(v).length > 0
+      ).length;
+
+      return count < LIMITS.CELL;
+    }, [cells]);
 
   const structureValue = useMemo(
     () => ({
@@ -542,6 +564,7 @@ export function TableProvider({
       setGlobalSearch,
       registerRef,
       updateCell,
+      canCreateNewCell,
       handleAddRow,
       handleDeleteRow,
       handleAddColumn,
@@ -584,6 +607,7 @@ export function TableProvider({
       headerHeight,
       registerRef,
       updateCell,
+      canCreateNewCell,
       handleAddRow,
       handleDeleteRow,
       handleAddColumn,

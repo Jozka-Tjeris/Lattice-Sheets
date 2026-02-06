@@ -13,6 +13,7 @@ import type {
   ColumnType,
 } from "~/components/table/controller/tableTypes";
 import { ContentRetriever } from "./ContentRetriever";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 
 interface BasePageShellProps {
   baseId: string;
@@ -149,6 +150,11 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   // Event Handlers
   // -----------------------
   const handleCreateTable = () => {
+    if(!tablesQuery.data) return;
+    if(tablesQuery.data?.length >= LIMITS.TABLE){
+      warnLimitReached("TABLE");
+      return;
+    }
     const name = prompt("Enter the new table name:", "New Table");
     if(!name) return;
     if(name?.trim() === ""){

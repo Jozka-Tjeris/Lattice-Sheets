@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
+import { LIMITS, warnLimitReached } from "~/constants/limits";
 import { api as trpc } from "~/trpc/react";
 
 export function useBaseMutations() {
@@ -104,9 +105,14 @@ export function useBaseMutations() {
 
   const handleCreateBase = useCallback(
     (name: string, iconColor: string) => {
+      if(!utils.base.listBases.getData()) return;
+      if(utils.base.listBases.getData()!.length >= LIMITS.BASE){
+        warnLimitReached("BASE");
+        return;
+      }
       return createBaseMutation.mutateAsync({ name, iconColor });
     },
-    [createBaseMutation],
+    [createBaseMutation, utils.base.listBases],
   );
 
   const handleRenameBase = useCallback(
