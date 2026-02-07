@@ -58,9 +58,9 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
         </div>
       </div>
       <div className="flex flex-1 justify-end">
-        <div className={`flex items-center gap-2 pr-2`}>
+        <div className={`flex items-center gap-2 px-2`}>
           {(isExporting || isImporting) && (
-            <span className="text-sm">Loading...</span>
+            <span className="text-xs">Loading...</span>
           )}
           <input
             id="json-upload"
@@ -72,13 +72,13 @@ export function TopBar({ tableId, baseId, allowAction, baseQueryData }: TopBarPr
 
           <label
             htmlFor="json-upload"
-            className="cursor-pointer bg-gray-200 px-3 py-[6] rounded-sm hover:bg-gray-300 text-sm min-w-[12%]"
+            className="cursor-pointer bg-gray-200 px-3 py-[6] rounded-sm hover:bg-gray-300 text-sm min-w-25"
           >
             {fileInput ? "Change file" : "Select JSON file"}
           </label>
 
           {fileInput && (
-            <span className="text-sm text-gray-600 truncate max-w-[88%]">
+            <span className="text-sm text-gray-600 truncate max-w-44">
               {fileInput.name}
             </span>
           )}

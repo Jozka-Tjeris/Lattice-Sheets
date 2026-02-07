@@ -6,6 +6,7 @@ import { enqueueTableMutation } from "~/server/queue/tableQueue";
 import { exportTableToCsv, exportTableToJson } from "~/server/services/tableExportService";
 import { importTableFromJson } from "~/server/services/tableImportService";
 import { ImportSchema } from "~/server/services/tableIOtypes";
+import { validateImportPayload } from "~/server/services/tableImportValidation";
 
 export const tableRouter = createTRPCRouter({
   getTable: protectedProcedure
@@ -109,9 +110,10 @@ export const tableRouter = createTRPCRouter({
   // IO-related
   importTable: protectedProcedure
     .input(ImportSchema)
-    .mutation(({ ctx, input }) =>
-      importTableFromJson(ctx.db, input.payload, ctx.session.user.id, input.target)
-    ),
+    .mutation(async ({ ctx, input }) => {
+      await validateImportPayload(ctx.db, input.payload, ctx.session.user.id, input.target);
+      return importTableFromJson(ctx.db, input.payload, ctx.session.user.id, input.target);
+    }),
 
   exportTable: protectedProcedure
     .input(z.object({ tableId: z.string() }))

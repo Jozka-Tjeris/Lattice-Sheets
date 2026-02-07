@@ -1,5 +1,4 @@
 import { useCallback, useState } from "react";
-import { LIMITS, warnLimitReached } from "~/constants/limits";
 import type { ImportTarget, IOTablePayload } from "~/server/services/tableIOtypes";
 import { api as trpc } from "~/trpc/react";
 
@@ -56,10 +55,6 @@ export function useTableIO() {
       if (file.size > 10 * 1024 * 1024) {
         throw new Error("File too large");
       }
-      if(!utils.table.listTablesByBaseId.getData()) return;
-      if(utils.table.listTablesByBaseId.getData()!.length >= LIMITS.TABLE){
-        warnLimitReached("TABLE");
-      }
       const text = await file.text();
       let parsed: unknown;
 
@@ -69,20 +64,35 @@ export function useTableIO() {
         throw new Error("Invalid JSON file");
       }
 
-      // Let the server schema be the source of truth
-      const { baseId: newBaseId } = await importTable.mutateAsync({
-        payload: parsed as IOTablePayload,
-        target,
-      });
+      try {
+        const { baseId: newBaseId } = await importTable.mutateAsync({
+          payload: parsed as IOTablePayload,
+          target,
+        });
 
-      // Refetch table query based on baseId if applicable, otherwise redirect to new base
-      if(target.mode === "existing-base"){
-        await utils.table.listTablesByBaseId.invalidate({ baseId });
-      } else{
-        return { newBaseId };
+        // Refetch table query based on baseId if applicable
+        if (target.mode === "existing-base") {
+          await utils.table.listTablesByBaseId.invalidate({ baseId });
+        } else {
+          return { newBaseId };
+        }
+      } catch (err: unknown) {
+        // Type guard to check if this is a TRPC error
+        const isTRPCError = (e: unknown): e is { data?: { code?: string }; message?: string } =>
+          typeof e === "object" && e !== null && "data" in e && typeof e.data === "object";
+
+        if (isTRPCError(err) && err.data?.code === "BAD_REQUEST") {
+          // backend limit validation error
+          const message = err.message ?? "Unknown error occurred";
+          alert("Failed to import table.\n\nReason: " + message);
+        } else {
+          // fallback for unexpected errors
+          console.error("Import failed:", err);
+          alert("Failed to import table. See console for details.");
+        }
       }
     },
-    [importTable, utils.table.listTablesByBaseId],
+    [importTable, utils.table.listTablesByBaseId]
   );
 
   return {
