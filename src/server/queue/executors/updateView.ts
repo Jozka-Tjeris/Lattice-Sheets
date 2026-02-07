@@ -1,5 +1,6 @@
 import { db } from "~/server/db";
 import type { UpdateViewMutation } from "../mutationTypes";
+import { LIMITS } from "~/constants/limits";
 
 export async function executeUpdateView(m: UpdateViewMutation) {
   if (m.isDefault) {
@@ -12,7 +13,7 @@ export async function executeUpdateView(m: UpdateViewMutation) {
   await db.view.updateMany({
     where: { id: m.viewId },
     data: {
-      ...(m.name && { name: m.name }),
+      ...(m.name && { name: m.name.slice(0, LIMITS.TEXT) }),
       ...(m.config && { config: m.config }),
       ...(typeof m.isDefault === "boolean" && { isDefault: m.isDefault }),
     },

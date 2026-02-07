@@ -1,21 +1,32 @@
 import { db } from "~/server/db";
 import type { AddColumnMutation } from "../mutationTypes";
+import { LIMITS } from "~/constants/limits";
 
 export async function executeAddColumn(m: AddColumnMutation) {
-  const lastColumn = await db.column.findFirst({
-    where: { tableId: m.tableId },
-    orderBy: { order: "desc" },
-    select: { order: true },
-  });
+  return await db.$transaction(async (tx) => {
+    const columnCount = await tx.column.count({
+      where: { tableId: m.tableId },
+    });
 
-  const nextOrder = (lastColumn?.order ?? -1) + 1;
+    if (columnCount >= LIMITS.COL) {
+      throw new Error("COLUMN_COUNT_LIMIT_EXCEEDED");
+    }
 
-  return await db.column.create({
-    data: {
-      tableId: m.tableId,
-      name: m.name,
-      columnType: m.columnType,
-      order: nextOrder,
-    },
+    const lastColumn = await tx.column.findFirst({
+      where: { tableId: m.tableId },
+      orderBy: { order: "desc" },
+      select: { order: true },
+    });
+
+    const nextOrder = (lastColumn?.order ?? -1) + 1;
+
+    return await tx.column.create({
+      data: {
+        tableId: m.tableId,
+        name: m.name.slice(0, LIMITS.TEXT),
+        columnType: m.columnType,
+        order: nextOrder,
+      },
+    });
   });
 }

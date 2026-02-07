@@ -155,7 +155,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
       warnLimitReached("TABLE");
       return;
     }
-    const name = prompt("Enter the new table name:", "New Table");
+    const name = prompt(`Enter the new table name (max length: ${LIMITS.TEXT}):`, "New Table");
     if(!name) return;
     if(name?.trim() === ""){
       alert("New table name cannot be empty");
@@ -165,7 +165,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
   };
 
   const handleRenameTable = (tableId: string) => {
-    const name = prompt("Enter the new table name:");
+    const name = prompt(`Enter the new table name (max length: ${LIMITS.TEXT}):`);
     if (!name?.trim()){
       alert("New table name cannot be empty");
       return;

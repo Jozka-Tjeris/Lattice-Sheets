@@ -147,7 +147,7 @@ export function useTableStructure(
         return;
       }
       if(!confirmStructuralChange("Do you want to add a column?")) return;
-      const colLabel = prompt("Enter column name:", "New Column");
+      const colLabel = prompt(`Enter column name (max length: ${LIMITS.TEXT}):`, "New Column");
       if(!colLabel) return;
       if(!colLabel?.trim()){
         alert("New column name cannot be empty");
@@ -332,7 +332,7 @@ export function useTableStructure(
         return;
       }
       if(!confirmStructuralChange("Do you want to rename this column?")) return;
-      const newLabel = prompt("Enter new column name:");
+      const newLabel = prompt(`Enter new column name (max length: ${LIMITS.TEXT}):`);
       if(!newLabel) return;
       if(!newLabel?.trim()){
         alert("Column name is invalid.");

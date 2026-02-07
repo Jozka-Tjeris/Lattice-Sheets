@@ -170,7 +170,7 @@ export function useTableViews(
     }
 
     if (!confirmStructuralChange("Do you want to create a new view?")) return;
-    const newViewName = prompt("Enter view name (be careful, you can't change the view name later):", "New view");
+    const newViewName = prompt(`Enter view name (max length: ${LIMITS.TEXT}) (be careful, you can't change the view name later):`, "New view");
     if(!newViewName) return;
     if (!newViewName.trim()) {
       alert("New view name cannot be empty");

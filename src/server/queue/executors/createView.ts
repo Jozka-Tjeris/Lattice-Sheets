@@ -1,20 +1,34 @@
 import { db } from "~/server/db";
 import type { CreateViewMutation } from "../mutationTypes";
+import { LIMITS } from "~/constants/limits";
 
 export async function executeCreateView(m: CreateViewMutation) {
-  if (m.isDefault) {
-    await db.view.updateMany({
-      where: { tableId: m.tableId, isDefault: true },
-      data: { isDefault: false },
+  return await db.$transaction(async (tx) => {
+    const viewCount = await tx.view.count({
+      where: { tableId: m.tableId },
     });
-  }
 
-  return await db.view.create({
-    data: {
-      tableId: m.tableId,
-      name: m.name,
-      config: m.config,
-      isDefault: !!m.isDefault,
-    },
+    if (viewCount >= LIMITS.VIEW) {
+      throw new Error("VIEW_COUNT_LIMIT_EXCEEDED");
+    }
+
+    if (m.isDefault) {
+      await tx.view.updateMany({
+        where: {
+          tableId: m.tableId,
+          isDefault: true,
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    return await tx.view.create({
+      data: {
+        tableId: m.tableId,
+        name: m.name.slice(0, LIMITS.TEXT),
+        config: m.config,
+        isDefault: !!m.isDefault,
+      },
+    });
   });
 }

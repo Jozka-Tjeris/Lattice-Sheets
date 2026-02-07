@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { LIMITS } from "~/constants/limits";
 
 export const baseRouter = createTRPCRouter({
   // ------------------
@@ -34,13 +35,26 @@ export const baseRouter = createTRPCRouter({
 
   createBase: protectedProcedure
     .input(z.object({ name: z.string().min(1), iconColor: z.string() }))
-    .mutation(({ ctx, input }) => {
-      return ctx.db.base.create({
-        data: {
-          name: input.name,
-          ownerId: ctx.session.user.id,
-          iconColor: input.iconColor,
-        },
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.$transaction(async (tx) => {
+        const baseCount = await tx.base.count({
+          where: { ownerId: ctx.session.user.id },
+        });
+
+        if (baseCount >= LIMITS.BASE) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "BASE_COUNT_LIMIT_EXCEEDED",
+          });
+        }
+
+        return await tx.base.create({
+          data: {
+            name: input.name.slice(0, LIMITS.TEXT),
+            ownerId: ctx.session.user.id,
+            iconColor: input.iconColor,
+          },
+        });
       });
     }),
 
@@ -52,7 +66,7 @@ export const baseRouter = createTRPCRouter({
           id: input.baseId,
           ownerId: ctx.session.user.id,
         },
-        data: { name: input.name },
+        data: { name: input.name.slice(0, LIMITS.TEXT) },
       });
 
       if (result.count === 0) {
