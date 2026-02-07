@@ -210,6 +210,21 @@ Each of these requires additional architectural guarantees and UX considerations
 
 - Mobile UX is limited to preserve desktop spreadsheet interactions
 
+> To maintain a responsive and consistent spreadsheet experience, the system enforces maximum limits on rows, columns, cells, and other entities. These limits apply to table creation, editing, and import operations.  
+
+| Resource / Field          | Maximum Limit |
+|---------------------------|---------------|
+| Rows per table            | 1,000         |
+| Columns per table         | 20            |
+| Non-empty cells per table | 20,000        |
+| Text length per cell      | 50 characters |
+| Number length per cell    | 15 digits     |
+| Views per table           | 5             |
+| Tables per base           | 5             |
+| Bases per user            | 2             |
+
+> **Note:** Attempts to exceed these limits will be blocked by the backend to ensure data integrity and consistent UX.
+
 ## 10. Setup
 
 This project was built primarily as an architectural and learning exercise rather than a production-ready deployment.
