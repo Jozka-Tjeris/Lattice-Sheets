@@ -1,6 +1,10 @@
 # Lattice Sheets
 An Airtable-inspired spreadsheet application focused on UX-driven architecture and optimistic state management.
 
+#### TL;DR
+
+A spreadsheet-style web app exploring complex UI state, optimistic updates, and UX-driven backend design using the T3 stack.
+
 ### Main table interface
 
 <img width="2146" height="1750" alt="table_state" src="https://github.com/user-attachments/assets/96eef5b1-303f-4805-94dd-10ca342c1e50" />
