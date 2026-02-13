@@ -43,12 +43,6 @@ export function useTableStructure(
     }
   }, [onStructureCommitted]);
 
-  const confirmStructuralChange = useCallback((action: string) => {
-    return confirm(
-      `${action}\n\nStructural changes are applied immediately and automatically saved to this view.`
-    );
-  }, []);
-
   const addRowMutation = trpc.row.addRow.useMutation();
   const deleteRowMutation = trpc.row.deleteRow.useMutation();
   const addColumnMutation = trpc.column.addColumn.useMutation();
@@ -70,7 +64,7 @@ export function useTableStructure(
         warnLimitReached("ROW");
         return;
       }
-      if(!confirmStructuralChange("Do you want to add a row?")) return;
+
       const optimisticId = `optimistic-row-${crypto.randomUUID()}`;
       optimisticRowIdMapRef.current[optimisticId] = null;
       const newRowLocal: TableRow = {
@@ -132,7 +126,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, columns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addRowMutation, utils, rows.length]
+    [tableId, setRows, columns, isViewDirty, maybeCommitStructure, userId, addRowMutation, utils, rows.length]
   );
 
   const handleAddColumn = useCallback(
@@ -146,7 +140,7 @@ export function useTableStructure(
         warnLimitReached("COL");
         return;
       }
-      if(!confirmStructuralChange("Do you want to add a column?")) return;
+
       const colLabel = prompt(`Enter column name (max length: ${LIMITS.TEXT}):`, "New Column");
       if(!colLabel) return;
       if(!colLabel?.trim()){
@@ -227,7 +221,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, userId, addColumnMutation, utils, columns.length]
+    [tableId, setColumns, isViewDirty, maybeCommitStructure, userId, addColumnMutation, utils, columns.length]
   );
 
   const handleDeleteRow = useCallback(
@@ -237,7 +231,7 @@ export function useTableStructure(
         alert("The current view must be saved before deleting any rows");
         return;
       }
-      if(!confirmStructuralChange(`Delete row "${rowPosition}"?\n\nThis will remove all its cell values.`)) return;
+      if(!confirm(`Delete row "${rowPosition}"?\n\nThis will remove all its cell values.`)) return;
       // Optimistic removal
       const prevRows = [...rows ?? []]; // capture current state for rollback
       const prevRowsCache = utils.row.getRows.getData({ tableId });
@@ -268,7 +262,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setRows, isViewDirty, confirmStructuralChange, maybeCommitStructure, rows, userId, deleteRowMutation, utils]
+    [tableId, setRows, isViewDirty, maybeCommitStructure, rows, userId, deleteRowMutation, utils]
   );
 
   const handleDeleteColumn = useCallback(
@@ -278,7 +272,7 @@ export function useTableStructure(
         alert("The current view must be saved before deleting any columns");
         return;
       }
-      if(!confirmStructuralChange("Do you want to delete this column?")) return;
+      if(!confirm("Do you want to delete this column?")) return;
       // Optimistic removal
       const prevColumnsLocal = [...columns ?? []];
       setColumns((prev) => prev.filter((c) => c.id !== columnId && c.internalId !== columnId));
@@ -321,7 +315,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, deleteColumnMutation, utils]
+    [tableId, setColumns, isViewDirty, maybeCommitStructure, columns, userId, deleteColumnMutation, utils]
   );
 
   const handleRenameColumn = useCallback(
@@ -331,7 +325,7 @@ export function useTableStructure(
         alert("The current view must be saved before renaming any columns");
         return;
       }
-      if(!confirmStructuralChange("Do you want to rename this column?")) return;
+      if(!confirm("Do you want to rename this column?")) return;
       const newLabel = prompt(`Enter new column name (max length: ${LIMITS.TEXT}):`);
       if(!newLabel) return;
       if(!newLabel?.trim()){
@@ -388,7 +382,7 @@ export function useTableStructure(
         maybeCommitStructure();
       }
     },
-    [tableId, setColumns, isViewDirty, confirmStructuralChange, maybeCommitStructure, columns, userId, renameColumnMutation, utils]
+    [tableId, setColumns, isViewDirty, maybeCommitStructure, columns, userId, renameColumnMutation, utils]
   );
 
   return {

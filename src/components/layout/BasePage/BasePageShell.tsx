@@ -166,6 +166,7 @@ export function BasePageShell({ baseId }: BasePageShellProps) {
 
   const handleRenameTable = (tableId: string) => {
     const name = prompt(`Enter the new table name (max length: ${LIMITS.TEXT}):`);
+    if (!name) return;
     if (!name?.trim()){
       alert("New table name cannot be empty");
       return;
