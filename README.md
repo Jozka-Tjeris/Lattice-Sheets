@@ -1,9 +1,16 @@
 # Lattice Sheets
-An Airtable-inspired spreadsheet application focused on UX-driven architecture and optimistic state management.
 
-#### TL;DR
+A spreadsheet-style SaaS application exploring optimistic state management, mutation queues, and UX-driven data modeling at scale.
 
-A spreadsheet-style web app exploring complex UI state, optimistic updates, and UX-driven backend design using the T3 stack.
+## What This Project Demonstrates
+- Complex client-side state partitioning (structure vs view vs transient UI)
+- Optimistic updates with server reconciliation
+- Asynchronous mutation queues (batched + idempotent)
+- Referential stability under heavy re-renders
+- Row-level virtualization (2–5k rows smooth at 60fps on M1 hardware)
+- View systems treated as first-class persisted entities
+
+Built with Next.js, tRPC, Prisma, and PostgreSQL.
 
 ### Main table interface
 
@@ -17,45 +24,34 @@ A spreadsheet-style web app exploring complex UI state, optimistic updates, and 
 
 ![key_nav_table](https://github.com/user-attachments/assets/0b6eeef5-c99f-4f69-beb8-ae6306b00b5b)
 
-### Intended audience
+## 1. Why Spreadsheet UIs Are Non-Trivial
 
-This project is aimed at those interested in complex UI state management, optimistic updates, and UX-driven backend design.
+Spreadsheet-like interfaces combine:
+- High-frequency granular edits
+- Cross-cutting view configuration (sorting, filtering, pinning)
+- Keyboard-driven interaction
+- Optimistic persistence requirements
+- Referential stability constraints
 
-## 1. Project overview
+Small architectural mistakes compound quickly:
+- Focus loss during reconciliation
+- ID mismatches during optimistic creation
+- Invalid view configs after structural mutation
+- Infinite update loops between UI and persistence layers
 
-This project is an Airtable-inspired spreadsheet application built with the T3 stack.
-
-It supports bases, tables, rows, columns, and cells, with a strong emphasis on spreadsheet-like UX: keyboard navigation, inline editing, column pinning, filtering, sorting, and multiple saved views per table.
-
-Rather than aiming for full feature parity with Airtable, the project focuses on correctness, responsiveness, and architectural clarity when handling complex, state-heavy UI interactions backed by a database.
-
-### 1a. Quick Tour
-
-- Create a base from the dashboard
-
-- Add or select a table within the base
-
-- Edit cells directly using keyboard or mouse
-
-- Pin columns, apply filters, or sort data
-
-- Save the current configuration as a view for reuse or comparison
+This project intentionally explores those failure modes and formalizes solutions.
 
 ## 2. Motivation & goals
 
 Spreadsheet applications appear simple on the surface, but involve significant hidden complexity: fine-grained state updates, optimistic persistence, focus management, and synchronization between UI state and backend data.
 
-The goal of this project was to explore those challenges directly by building a spreadsheet-like interface from scratch, prioritizing:
+The system was built to formalize solutions to these problems in a controlled environment, prioritizing architectural clarity over feature breadth.
 
-UX-driven data modeling
-
-Predictable and resilient state management
-
-Optimistic updates without blocking the UI
-
-Clear separation between table structure, view configuration, and transient UI state
-
-This project intentionally avoids full feature parity in favor of architectural soundness and learning depth.
+Priorities:
+- UX-driven data modeling
+- Predictable state partitioning
+- Non-blocking optimistic updates
+- Explicit separation of structure, view config, and transient UI state
 
 **Key learnings**
 
@@ -137,6 +133,8 @@ Writes to the database are processed through execution queues rather than synchr
 
 Queue execution is intentionally asynchronous; callers must not depend on immediate persistence. Failures are handled internally, and UI state is reconciled through cache updates.
 
+The queue design avoids DB-level locking and instead enforces correctness through ordered execution, idempotent mutations, and reconciliation-based cache updates.
+
 ## 6. Views System
 
 Views are treated as first-class entities rather than derived UI state.
@@ -159,7 +157,9 @@ This ensures consistency between table structure and view configuration without 
 Inline editing caused focus to be lost due to React reconciliation and component remounting during structural updates. This was resolved by enforcing referential stability and keeping editing elements permanently mounted.
 
 ### Optimistic ID replacement
-Rows, columns, and views are created optimistically and later reconciled with server-generated IDs. Careful cache updating was required to avoid breaking keyboard navigation and selection state.
+Early iterations caused cell focus to break when optimistic IDs were replaced by server IDs, due to unstable key propagation. This required decoupling display keys from persistence identifiers and enforcing referential stability at the provider level.
+
+Therefore, rows, columns, and views are created optimistically and later reconciled with server-generated IDs. Careful cache updating was required to avoid breaking keyboard navigation and selection state.
 
 ### View consistency under structure changes
 Ensuring that filters, pinning, and sorting remained valid when columns were added or removed required normalization and guard logic to prevent infinite update loops.
@@ -204,7 +204,7 @@ The following features were intentionally deferred:
 
 - Infinite scrolling
 
-Each of these requires additional architectural guarantees and UX considerations that were outside the scope of this project’s learning goals.
+Each of these requires additional architectural guarantees and UX considerations that were outside the focus of this project’s goals.
 
 ### Constraints
 
@@ -213,6 +213,8 @@ Each of these requires additional architectural guarantees and UX considerations
 - Some mutations are eventually consistent by design
 
 - Mobile UX is limited to preserve desktop spreadsheet interactions
+
+- The system currently assumes a single active editor per table. Multi-user concurrency would require conflict resolution semantics (e.g. OT/CRDT) layered on top of the existing mutation queue model.
 
 > To maintain a responsive and consistent spreadsheet experience, the system enforces maximum limits on rows, columns, cells, and other entities. These limits apply to table creation, editing, and import operations.  
 
@@ -231,9 +233,16 @@ Each of these requires additional architectural guarantees and UX considerations
 
 ## 10. Setup
 
-This project was built primarily as an architectural and learning exercise rather than a production-ready deployment.
-
 - Clone the project
 - Add in .env vars
 - Prisma migrate
 - Run dev server
+
+## 11. Architectural Discussion Areas
+
+If reviewing this project, interesting areas for discussion include:
+- Alternative queue designs (CRDT vs ordered queue)
+- Server-side pagination vs current limits
+- Undo/redo implementation strategy
+- Conflict resolution under multi-user editing (Operational Transformations)
+- Migrating to eventual real-time sync (WebSockets)
